@@ -10,6 +10,8 @@ const nombres: Record<string, string> = {
   traspaso_a_humano: 'Pasada a una persona',
   mensaje_operador: 'Mensaje del operador',
   devuelta_al_bot: 'Devuelta al asistente',
+  mensaje_operador_demo: 'Mensaje de operador (demo)',
+  devuelta_al_bot_demo: 'Devuelta al asistente (demo)',
   urgencia_detectada: 'Posible urgencia',
   consejo_medico_rechazado: 'Consejo médico rechazado',
   limite_superado: 'Límite de mensajes',
@@ -23,7 +25,8 @@ const avisos = new Set(['urgencia_detectada', 'fallo_ia', 'limite_superado', 'co
 function color(tipo: string) {
   if (avisos.has(tipo)) return 'bg-ambar text-ambar'
   if (tipo.startsWith('cita_')) return 'bg-cian text-cian'
-  if (tipo === 'traspaso_a_humano' || tipo === 'mensaje_operador' || tipo === 'devuelta_al_bot') return 'bg-coral text-coral'
+  if (tipo === 'traspaso_a_humano' || tipo.startsWith('mensaje_operador') || tipo.startsWith('devuelta_al_bot'))
+    return 'bg-coral text-coral'
   if (tipo === 'herramienta' || tipo === 'respuesta_ia') return 'bg-violeta text-violeta'
   return 'bg-rosa text-rosa'
 }

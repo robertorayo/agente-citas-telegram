@@ -227,6 +227,8 @@
   }
 
   function asegurarSesion() {
+    // El panel de demo (en otra pestaña) puede haber creado ya la sesión: se reutiliza en vez de crear otra.
+    if (!token) token = leerToken();
     if (token) return Promise.resolve();
     return api('POST', '/api/web/sesion').then(function (d) { guardarToken(d.token); });
   }

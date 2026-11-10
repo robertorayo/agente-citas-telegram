@@ -240,3 +240,108 @@ def test_la_auditoria_no_muestra_las_respuestas_de_la_ia(cliente):
     cliente.portal.call(n.procesar, 7, "Ana", "hola")
     tipos = {e["tipo"] for e in cliente.get("/api/eventos", headers=TOKEN).json()}
     assert "respuesta_ia" not in tipos and "conversacion_nueva" in tipos
+
+
+def _visitante(cliente):
+    return {"X-Web-Token": cliente.post("/api/web/sesion").json()["token"]}
+
+
+def test_panel_demo_exige_sesion_web(cliente):
+    assert cliente.get("/api/demo/conversaciones").status_code == 401
+    assert cliente.get("/api/demo/conversaciones", headers={"X-Web-Token": "inventado"}).status_code == 401
+    # El token del panel completo no sirve para la demo, ni el del visitante para el panel completo.
+    assert cliente.get("/api/demo/conversaciones", headers=TOKEN).status_code == 401
+    assert cliente.get("/api/conversaciones", headers=_visitante(cliente)).status_code == 401
+
+
+def test_panel_demo_solo_ve_lo_propio(cliente):
+    nucleo = cliente.app.state.nucleo
+    cliente.portal.call(nucleo.procesar, 7, "Ana", "Quiero hablar con una persona")  # alguien de Telegram
+    a, b = _visitante(cliente), _visitante(cliente)
+    cliente.post("/api/web/mensajes", json={"texto": "secreto de A"}, headers=a)
+
+    convs_b = cliente.get("/api/demo/conversaciones", headers=b).json()
+    assert len(convs_b) == 1 and convs_b[0]["canal"] == "web"
+    id_a = cliente.get("/api/demo/conversaciones", headers=a).json()[0]["chat_id"]
+    assert id_a != convs_b[0]["chat_id"]
+
+    # B no puede leer, responder ni devolver la conversación de A ni la de Telegram.
+    for ajeno in (id_a, 7):
+        assert cliente.get(f"/api/demo/conversaciones/{ajeno}/mensajes", headers=b).status_code == 404
+        r = cliente.post(f"/api/demo/conversaciones/{ajeno}/mensajes", json={"texto": "hola"}, headers=b)
+        assert r.status_code == 404
+        assert cliente.post(f"/api/demo/conversaciones/{ajeno}/devolver", headers=b).status_code == 404
+    assert cliente.canal.enviados == []
+
+    assert cliente.get("/api/demo/resumen", headers=b).json() == {
+        "esperando_operador": 0, "conversaciones": 1, "citas_pendientes": 0}
+    eventos_b = cliente.get("/api/demo/eventos", headers=b).json()
+    assert {e["chat_id"] for e in eventos_b} == {convs_b[0]["chat_id"]}
+    assert cliente.get("/api/demo/citas", headers=b).json() == []
+    assert cliente.get("/api/demo/metricas", headers=b).status_code == 200
+
+
+def test_panel_demo_atiende_su_propio_chat(cliente):
+    a = _visitante(cliente)
+    r = cliente.post("/api/web/mensajes", json={"texto": "Quiero hablar con una persona"}, headers=a)
+    ultimo = r.json()[-1]["id"]
+    chat_id = cliente.get("/api/demo/conversaciones", headers=a).json()[0]["chat_id"]
+    assert cliente.get("/api/demo/resumen", headers=a).json()["esperando_operador"] == 1
+
+    r = cliente.post(f"/api/demo/conversaciones/{chat_id}/mensajes", json={"texto": "Te atiendo yo"}, headers=a)
+    assert r.status_code == 201
+    assert [m["texto"] for m in cliente.get(f"/api/web/mensajes?desde={ultimo}", headers=a).json()] == ["Te atiendo yo"]
+
+    assert cliente.post(f"/api/demo/conversaciones/{chat_id}/devolver", headers=a).status_code == 200
+    assert cliente.get("/api/demo/conversaciones", headers=a).json()[0]["modo"] == "bot"
+
+
+def test_panel_demo_limita_los_mensajes(cliente):
+    a = _visitante(cliente)
+    chat_id = cliente.get("/api/demo/conversaciones", headers=a).json()[0]["chat_id"]
+    codigos = [cliente.post(f"/api/demo/conversaciones/{chat_id}/mensajes", json={"texto": "x"}, headers=a).status_code
+               for _ in range(21)]
+    assert codigos[:20] == [201] * 20 and codigos[20] == 429
+
+
+def test_panel_demo_solo_ve_sus_citas(cliente):
+    from datetime import timedelta
+
+    from agente_citas.modelos import Cita
+
+    nucleo = cliente.app.state.nucleo
+    a = _visitante(cliente)
+    id_a = cliente.get("/api/demo/conversaciones", headers=a).json()[0]["chat_id"]
+    manana = nucleo.reloj() + timedelta(days=1)
+
+    async def crear():
+        async with nucleo.sesiones() as s:
+            for i, (chat_id, nombre) in enumerate([(7, "Ana de Telegram"), (id_a, "Visitante A")]):
+                inicio = manana + timedelta(hours=i)
+                fin = inicio + timedelta(minutes=20)
+                s.add(Cita(chat_id=chat_id, nombre=nombre, servicio_id=1, inicio=inicio, fin=fin))
+            await s.commit()
+
+    cliente.portal.call(crear)
+    assert [c["nombre"] for c in cliente.get("/api/demo/citas", headers=a).json()] == ["Visitante A"]
+    assert cliente.get("/api/demo/resumen", headers=a).json()["citas_pendientes"] == 1
+    assert len(cliente.get("/api/citas", headers=TOKEN).json()) == 2  # el panel completo ve las dos
+
+
+def test_panel_demo_limita_las_devoluciones_y_no_cuenta_como_operador(cliente):
+    a = _visitante(cliente)
+    chat_id = cliente.get("/api/demo/conversaciones", headers=a).json()[0]["chat_id"]
+    codigos = [cliente.post(f"/api/demo/conversaciones/{chat_id}/devolver", headers=a).status_code for _ in range(4)]
+    assert codigos == [200, 200, 200, 429]
+
+    cliente.post(f"/api/demo/conversaciones/{chat_id}/mensajes", json={"texto": "hola"}, headers=a)
+    tipos = {e["tipo"] for e in cliente.get("/api/eventos", headers=TOKEN).json()}
+    assert {"mensaje_operador_demo", "devuelta_al_bot_demo"} <= tipos
+    assert not {"mensaje_operador", "devuelta_al_bot"} & tipos
+    assert cliente.get("/api/metricas", headers=TOKEN).json()["mensajes_de_operador"] == 0
+
+
+def test_panel_demo_metricas_solo_periodos_del_panel(cliente):
+    a = _visitante(cliente)
+    assert cliente.get("/api/demo/metricas?horas=1", headers=a).json()["horas"] == 24
+    assert cliente.get("/api/demo/metricas?horas=100000", headers=a).json()["horas"] == 720

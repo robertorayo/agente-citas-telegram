@@ -72,11 +72,42 @@ export interface Salud {
 }
 
 const CLAVE = 'panel-token'
+const CLAVE_DEMO = 'panel-demo'
+// La misma clave que usa el widget de chat (widget.js): así el panel de demo y el chat comparten conversación.
+const CLAVE_CHAT = 'clinica-alba-chat'
+
+function leerDe(almacen: Storage, clave: string) {
+  try {
+    return almacen.getItem(clave) ?? ''
+  } catch {
+    return ''
+  }
+}
 
 export const token = {
-  leer: () => sessionStorage.getItem(CLAVE) ?? '',
+  leer: () => leerDe(sessionStorage, CLAVE),
   guardar: (t: string) => sessionStorage.setItem(CLAVE, t),
   borrar: () => sessionStorage.removeItem(CLAVE),
+}
+
+// Modo demo: el visitante entra sin clave y el servidor solo le enseña su propia conversación del chat web.
+export const demo = {
+  activo: () => leerDe(sessionStorage, CLAVE_DEMO) === '1',
+  async entrar() {
+    if (!leerDe(localStorage, CLAVE_CHAT)) {
+      const r = await fetch('/api/web/sesion', { method: 'POST' })
+      if (r.status === 429) throw new ErrorApi(429, 'Demasiadas sesiones nuevas. Inténtalo más tarde.')
+      if (!r.ok) throw new ErrorApi(r.status, 'No se ha podido crear la sesión de demo.')
+      const { token: nuevo } = (await r.json()) as { token: string }
+      try {
+        localStorage.setItem(CLAVE_CHAT, nuevo)
+      } catch {
+        throw new ErrorApi(0, 'Tu navegador no permite guardar la sesión: activa el almacenamiento del sitio.')
+      }
+    }
+    sessionStorage.setItem(CLAVE_DEMO, '1')
+  },
+  salir: () => sessionStorage.removeItem(CLAVE_DEMO),
 }
 
 export class ErrorApi extends Error {
@@ -88,10 +119,17 @@ export class ErrorApi extends Error {
 }
 
 async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
-  const r = await fetch(`/api${ruta}`, {
+  // En modo demo todo va a /api/demo/... con el token del chat; la salud es pública y no cambia.
+  const enDemo = demo.activo() && ruta !== '/salud'
+  const credencial: Record<string, string> = enDemo
+    ? { 'X-Web-Token': leerDe(localStorage, CLAVE_CHAT) }
+    : { 'X-Panel-Token': token.leer() }
+  const r = await fetch(`/api${enDemo ? '/demo' : ''}${ruta}`, {
     ...opciones,
-    headers: { 'Content-Type': 'application/json', 'X-Panel-Token': token.leer(), ...opciones.headers },
+    headers: { 'Content-Type': 'application/json', ...credencial, ...opciones.headers },
   })
+  // Si el servidor ya no reconoce la sesión del chat, se olvida: al volver a entrar en demo se crea otra.
+  if (enDemo && r.status === 401) localStorage.removeItem(CLAVE_CHAT)
   if (!r.ok) {
     const cuerpo = await r.json().catch(() => ({}))
     const detalle = typeof cuerpo.detail === 'string' ? cuerpo.detail : `Error ${r.status}`

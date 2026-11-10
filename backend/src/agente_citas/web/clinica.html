@@ -156,6 +156,7 @@
     }
     .pasos b { display: block; color: #fff; font-size: 17px; margin-bottom: 4px; }
     .pasos q { color: #ffd2e4; quotes: "«" "»"; }
+    .enlace { color: #fff; font-weight: 700; text-decoration-color: var(--rosa); text-underline-offset: 3px; }
 
     .banda {
       position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
@@ -248,7 +249,7 @@
       <nav aria-label="Principal">
         <a href="#servicios">Servicios</a>
         <a href="#probar">Cómo probarlo</a>
-        <a class="panel" href="/panel/">Panel de recepción</a>
+        <a class="panel" href="/panel/?demo" target="_blank" rel="noopener">Panel de recepción</a>
       </nav>
     </div>
   </header>
@@ -329,12 +330,12 @@
         <div class="titular aparece">
           <small class="degradado">Cómo probar la demo</small>
           <h2>Cuatro cosas que puedes pedirle</h2>
-          <p>Abre el chat de abajo a la derecha o escribe al bot en Telegram. Las conversaciones de los dos canales llegan al mismo panel.</p>
+          <p>Abre el chat de abajo a la derecha o escribe al bot en Telegram. Las conversaciones de los dos canales llegan al mismo panel de recepción.</p>
         </div>
         <ol class="pasos">
           <li class="aparece"><b>Pide una cita</b>Escribe con normalidad: <q>¿Tenéis hueco para fisio el jueves por la tarde?</q></li>
           <li class="aparece" style="--retraso:.08s"><b>Consulta o cancela</b>Pregunta <q>¿Qué citas tengo?</q> y cancela la que quieras.</li>
-          <li class="aparece" style="--retraso:.16s"><b>Habla con una persona</b>El asistente deja de responder y la conversación aparece en el panel de recepción, desde donde contesta el equipo.</li>
+          <li class="aparece" style="--retraso:.16s"><b>Haz de recepcionista</b>Pide «hablar con una persona» y abre el <a class="enlace" href="/panel/?demo" target="_blank" rel="noopener">panel de recepción en modo demo</a>: verás tu conversación y podrás contestarte como el equipo de la clínica.</li>
           <li class="aparece" style="--retraso:.24s"><b>Prueba los límites</b>Pide un consejo médico o escribe una urgencia y verás cómo responde el asistente.</li>
         </ol>
       </div>
@@ -360,7 +361,7 @@
   <footer>
     <div class="envoltura">
       <span>Clínica Alba es un centro ficticio: demo técnica de un agente de citas.</span>
-      <a href="/panel/">Panel de recepción →</a>
+      <a href="/panel/?demo" target="_blank" rel="noopener">Panel de recepción (demo) →</a>
     </div>
   </footer>
 

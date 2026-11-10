@@ -163,8 +163,11 @@ class Nucleo:
 
     # ---- Acciones del operador (panel) ----
 
-    async def mensaje_operador(self, chat_id: int, texto: str) -> None:
-        """Respuesta de una persona del centro. En Telegram se envía; en la web, el widget la recoge."""
+    async def mensaje_operador(self, chat_id: int, texto: str, demo: bool = False) -> None:
+        """Respuesta de una persona del centro. En Telegram se envía; en la web, el widget la recoge.
+
+        Con `demo`, la escribe el propio visitante desde el panel de demostración: se audita con otro tipo de
+        evento para que no cuente como trabajo del equipo en las métricas."""
         async with self.sesiones() as s:
             conv = await s.get(Conversacion, chat_id)
             if conv is None:
@@ -178,16 +181,16 @@ class Nucleo:
                 await self._traspasar(s, conv, "Intervención del operador", avisar=False)
             conv.actualizada = self.reloj()
             await self._guardar(s, chat_id, Autor.OPERADOR, texto)
-            await registrar(s, "mensaje_operador", chat_id)
+            await registrar(s, "mensaje_operador_demo" if demo else "mensaje_operador", chat_id)
             await s.commit()
 
-    async def devolver_al_bot(self, chat_id: int) -> None:
+    async def devolver_al_bot(self, chat_id: int, demo: bool = False) -> None:
         async with self.sesiones() as s:
             conv = await s.get(Conversacion, chat_id)
             if conv is None:
                 raise LookupError("Conversación no encontrada")
             conv.modo, conv.motivo_traspaso, conv.actualizada = Modo.BOT, None, self.reloj()
-            await registrar(s, "devuelta_al_bot", chat_id)
+            await registrar(s, "devuelta_al_bot_demo" if demo else "devuelta_al_bot", chat_id)
             await self._guardar(s, chat_id, Autor.BOT, AVISO_DEVUELTA)
             await s.commit()
             canal = conv.canal

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { api, ErrorApi, token } from './api'
+import { api, demo, ErrorApi, token } from './api'
 import { Auditoria } from './componentes/Auditoria'
 import { Chat } from './componentes/Chat'
 import { Citas } from './componentes/Citas'
@@ -11,7 +11,7 @@ import { useSondeo } from './useSondeo'
 type Vista = 'conversaciones' | 'citas' | 'metricas' | 'auditoria'
 
 export default function App() {
-  const [conectado, setConectado] = useState(Boolean(token.leer()))
+  const [conectado, setConectado] = useState(Boolean(token.leer()) || demo.activo())
   return (
     <>
       <Fondo />
@@ -19,6 +19,7 @@ export default function App() {
         <Panel
           alSalir={() => {
             token.borrar()
+            demo.salir()
             setConectado(false)
           }}
         />
@@ -46,6 +47,36 @@ function Acceso({ alEntrar }: { alEntrar: () => void }) {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
 
+  async function entrarDemo() {
+    setCargando(true)
+    setError('')
+    try {
+      await demo.entrar()
+      try {
+        await api.resumen()
+      } catch (err) {
+        // La sesión del chat guardada ya no existe en el servidor (y `pedir` la ha olvidado): se crea otra.
+        if (!(err instanceof ErrorApi && err.status === 401)) throw err
+        await demo.entrar()
+      }
+      alEntrar()
+    } catch (err) {
+      demo.salir()
+      setError((err as Error).message)
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  // Desde la web de la clínica se llega con /panel/?demo y se entra directamente en modo demo.
+  const auto = useRef(false)
+  useEffect(() => {
+    if (auto.current || !new URLSearchParams(location.search).has('demo')) return
+    auto.current = true
+    history.replaceState(null, '', location.pathname)
+    void entrarDemo()
+  })
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
     setCargando(true)
@@ -68,12 +99,25 @@ function Acceso({ alEntrar }: { alEntrar: () => void }) {
         <h1 className="mt-7 text-2xl font-extrabold tracking-tight">
           Panel de <span className="text-alba">recepción</span>
         </h1>
-        <p className="mt-1 text-sm text-slate-500">Introduce la clave del panel (PANEL_TOKEN).</p>
-        <label className="mt-6 block text-sm font-semibold" htmlFor="clave">Clave</label>
+        <div className="mt-5 rounded-2xl bg-alba/10 p-4 ring-1 ring-rosa/20">
+          <p className="text-sm text-slate-600">
+            ¿Vienes de la web? Entra sin clave: verás tu propia conversación del chat y podrás contestarte como si
+            fueras el equipo de recepción.
+          </p>
+          <button
+            type="button"
+            onClick={entrarDemo}
+            disabled={cargando}
+            className="mt-3 w-full animate-brillo rounded-xl bg-alba py-2.5 font-bold text-white shadow-[0_14px_30px_-12px_rgb(255_61_139/0.7)] transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
+          >
+            Entrar en modo demo
+          </button>
+        </div>
+        <p className="mt-6 text-sm text-slate-500">O, si eres del equipo, introduce la clave del panel.</p>
+        <label className="mt-3 block text-sm font-semibold" htmlFor="clave">Clave</label>
         <input
           id="clave"
           type="password"
-          autoFocus
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           className="mt-1.5 w-full rounded-xl border-[1.5px] border-violet-100 bg-white/70 px-3.5 py-2.5 transition outline-none focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violeta/15"
@@ -81,9 +125,9 @@ function Acceso({ alEntrar }: { alEntrar: () => void }) {
         {error && <p className="mt-2 text-sm text-rose-600" role="alert">{error}</p>}
         <button
           disabled={!valor || cargando}
-          className="mt-6 w-full animate-brillo rounded-xl bg-alba py-2.5 font-bold text-white shadow-[0_14px_30px_-12px_rgb(255_61_139/0.7)] transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
+          className="mt-4 w-full rounded-xl bg-tinta py-2.5 font-bold text-white transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
         >
-          {cargando ? 'Comprobando…' : 'Entrar'}
+          {cargando ? 'Comprobando…' : 'Entrar con clave'}
         </button>
       </form>
     </main>
@@ -128,6 +172,8 @@ function Panel({ alSalir }: { alSalir: () => void }) {
           </button>
         </div>
       </header>
+
+      {demo.activo() && <AvisoDemo />}
 
       <Tarjetas resumen={resumen.datos} />
 
@@ -255,5 +301,25 @@ function Estado({ activo, texto }: { activo: boolean | undefined; texto: string 
       <span className={`size-2 rounded-full ${color} ${activo ? 'animate-latido' : ''}`} />
       {texto} {activo === false && <span className="font-normal text-slate-400">(apagado)</span>}
     </span>
+  )
+}
+
+function AvisoDemo() {
+  return (
+    <div className="vidrio flex animate-brotar flex-wrap items-center justify-between gap-3 rounded-2xl border-l-4 border-rosa px-4 py-3 text-sm">
+      <p className="text-slate-600">
+        <b className="text-tinta">Modo demo.</b> Solo ves tu conversación del chat de la web. Pide en el chat «hablar con
+        una persona» y contéstate desde aquí (al equipo real también le llega un aviso). Las métricas son las de toda
+        la demo.
+      </p>
+      <a
+        href="/"
+        target="_blank"
+        rel="noopener"
+        className="rounded-full bg-tinta px-3.5 py-1.5 font-semibold whitespace-nowrap text-white transition hover:bg-rosa"
+      >
+        Abrir el chat ↗
+      </a>
+    </div>
   )
 }
