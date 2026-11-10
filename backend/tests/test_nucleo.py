@@ -223,3 +223,45 @@ async def test_canal_web(sesiones):
     await n.mensaje_operador(conv.chat_id, "Hola, te atiendo")  # en la web no hace falta Telegram
     textos = [m.texto for m in await n.mensajes_desde(conv.chat_id)]
     assert textos[-1] == "Hola, te atiendo"
+
+
+def test_limpia_respuestas_en_bucle():
+    from agente_citas.ia import limpiar_respuesta
+
+    bucle = ("En lunes 16 tienes las 09:00 y las 09:20. ¿Qué hora prefieres?(Esperando tu elección de hora)."
+             "(Esperando tu elección de hora).¿Qué hora prefieres? (Esperando tu respuesta).")
+    assert limpiar_respuesta(bucle) == "En lunes 16 tienes las 09:00 y las 09:20. ¿Qué hora prefieres?"
+
+
+def test_corta_en_la_ultima_frase_completa():
+    from agente_citas.ia import limpiar_respuesta
+
+    assert limpiar_respuesta("Hay hueco a las 9. Te reservo a las", cortada=True) == "Hay hueco a las 9."
+    largo = " ".join(f"Frase número {i}." for i in range(200))
+    assert len(limpiar_respuesta(largo)) <= 900 and limpiar_respuesta(largo).endswith(".")
+
+
+async def test_el_nucleo_no_guarda_el_bucle(sesiones):
+    bucle = "¿Qué hora prefieres? (Esperando tu respuesta). ¿Qué hora prefieres?"
+    modelo = ModeloSimulado(RespuestaModelo(texto=bucle))
+    r = await nucleo(sesiones, modelo).procesar(7, "Ana", "lunes 16")
+    assert r.texto == "¿Qué hora prefieres?"
+
+
+def test_la_limpieza_respeta_respuestas_normales():
+    from agente_citas.ia import limpiar_respuesta as limpiar
+
+    horas = "Lunes 16:\n- 09:00\n- 09:20\nMartes 17:\n- 09:00\n- 10:00"
+    assert limpiar(horas) == horas  # la misma hora en días distintos no es una repetición
+    for texto in ["Cuesta 12.50 € y dura 1.5 horas.", "¿Te va a las 9.30?", "Mira https://www.ejemplo.es/citas hoy.",
+                  "Tu cita queda (pendiente de confirmación) para el lunes.", "👍", "¡Perfecto!... nos vemos"]:
+        assert limpiar(texto) == texto
+
+
+def test_el_corte_por_longitud_conserva_las_listas():
+    from agente_citas.ia import limpiar_respuesta as limpiar
+
+    lista = "Intro.\n" + "\n".join(f"- Opción {i} a las 10:00" for i in range(60))
+    recortada = limpiar(lista)
+    assert len(recortada) <= 900 and recortada.count("- Opción") > 30
+    assert limpiar("Hay hueco a las 9. Te reservo a las", cortada=True) == "Hay hueco a las 9."
