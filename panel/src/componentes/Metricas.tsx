@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { api } from '../api'
+import { useContador } from '../useContador'
 import { useSondeo } from '../useSondeo'
 
 const periodos: [number, string][] = [
-  [24, 'Últimas 24 h'],
-  [24 * 7, 'Últimos 7 días'],
-  [24 * 30, 'Últimos 30 días'],
+  [24, '24 h'],
+  [24 * 7, '7 días'],
+  [24 * 30, '30 días'],
 ]
 
 const nombresHerramienta: Record<string, string> = {
@@ -21,6 +22,15 @@ const nombresHerramienta: Record<string, string> = {
 const ms = (v: number | null) => (v === null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`)
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1)} %`)
 
+// Acento de color de cada grupo de cifras.
+const acentos = {
+  rosa: 'from-rosa to-violeta',
+  ambar: 'from-ambar to-coral',
+  cian: 'from-cian to-menta',
+  violeta: 'from-violeta to-cian',
+} as const
+type Acento = keyof typeof acentos
+
 export function Metricas() {
   const [horas, setHoras] = useState(24)
   return <Panel key={horas} horas={horas} alCambiar={setHoras} />
@@ -32,57 +42,70 @@ function Panel({ horas, alCambiar }: { horas: number; alCambiar: (h: number) => 
   const { datos: m, error } = useSondeo(() => api.metricas(horas), 15000)
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">Métricas del servicio</h2>
-        <select
-          value={horas}
-          onChange={(e) => alCambiar(Number(e.target.value))}
-          aria-label="Periodo"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
-        >
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-extrabold tracking-tight">
+          Métricas del <span className="text-alba">servicio</span>
+        </h2>
+        <div className="vidrio flex gap-1 rounded-full p-1" role="group" aria-label="Periodo">
           {periodos.map(([valor, texto]) => (
-            <option key={valor} value={valor}>{texto}</option>
+            <button
+              key={valor}
+              aria-pressed={horas === valor}
+              onClick={() => alCambiar(valor)}
+              className={`rounded-full px-3.5 py-1 text-sm font-semibold transition duration-300 ${
+                horas === valor ? 'bg-tinta text-white' : 'text-slate-600 hover:text-tinta'
+              }`}
+            >
+              {texto}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
-      {error && <p className="text-sm text-red-600" role="alert">{error.message}</p>}
+      {error && <p className="text-sm text-rose-600" role="alert">{error.message}</p>}
 
-      <Grupo titulo="Actividad">
-        <Dato titulo="Conversaciones activas" valor={m?.conversaciones_activas} />
-        <Dato titulo="Conversaciones nuevas" valor={m?.conversaciones_nuevas} />
-        <Dato titulo="Mensajes de usuarios" valor={m?.mensajes_de_usuarios} />
+      <Grupo titulo="Actividad" acento="rosa">
+        <Dato titulo="Conversaciones activas" valor={m?.conversaciones_activas} acento="rosa" i={0} />
+        <Dato titulo="Conversaciones nuevas" valor={m?.conversaciones_nuevas} acento="rosa" i={1} />
+        <Dato titulo="Mensajes de usuarios" valor={m?.mensajes_de_usuarios} acento="rosa" i={2} />
         <Dato
           titulo="Por canal"
           valor={m ? `${m.por_canal.telegram ?? 0} Telegram · ${m.por_canal.web ?? 0} web` : undefined}
+          acento="rosa"
+          i={3}
+          pequeno
         />
       </Grupo>
 
-      <Grupo titulo="Citas y traspasos">
-        <Dato titulo="Citas reservadas" valor={m?.citas_reservadas} color="text-teal-700" />
-        <Dato titulo="Citas canceladas" valor={m?.citas_canceladas} />
-        <Dato titulo="Pasadas a una persona" valor={m?.traspasos} color="text-amber-600" />
-        <Dato titulo="Mensajes de operador" valor={m?.mensajes_de_operador} />
+      <Grupo titulo="Citas y traspasos" acento="cian">
+        <Dato titulo="Citas reservadas" valor={m?.citas_reservadas} acento="cian" i={0} />
+        <Dato titulo="Citas canceladas" valor={m?.citas_canceladas} acento="cian" i={1} />
+        <Dato titulo="Pasadas a una persona" valor={m?.traspasos} acento="ambar" i={2} />
+        <Dato titulo="Mensajes de operador" valor={m?.mensajes_de_operador} acento="ambar" i={3} />
       </Grupo>
 
-      <Grupo titulo="Inteligencia artificial">
-        <Dato titulo="Respuestas" valor={m?.ia.respuestas} />
+      <Grupo titulo="Inteligencia artificial" acento="violeta">
+        <Dato titulo="Respuestas" valor={m?.ia.respuestas} acento="violeta" i={0} />
         <Dato
           titulo="Tasa de fallo"
           valor={m ? pct(m.ia.tasa_de_fallo) : undefined}
-          color={m && m.ia.fallos > 0 ? 'text-red-600' : undefined}
+          acento={m && m.ia.fallos > 0 ? 'ambar' : 'violeta'}
+          alerta={Boolean(m && m.ia.fallos > 0)}
+          i={1}
         />
-        <Dato titulo="Tiempo medio" valor={m ? ms(m.ia.ms_media) : undefined} />
-        <Dato titulo="Tiempo p95" valor={m ? ms(m.ia.ms_p95) : undefined} />
+        <Dato titulo="Tiempo medio" valor={m ? ms(m.ia.ms_media) : undefined} acento="violeta" i={2} />
+        <Dato titulo="Tiempo p95" valor={m ? ms(m.ia.ms_p95) : undefined} acento="violeta" i={3} />
       </Grupo>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Lista
           titulo="Herramientas usadas por la IA"
+          acento="violeta"
           filas={m ? Object.entries(m.ia.herramientas).map(([k, v]) => [nombresHerramienta[k] ?? k, v]) : null}
         />
         <Lista
           titulo="Guardarraíles"
+          acento="ambar"
           filas={
             m
               ? [
@@ -102,37 +125,65 @@ function Panel({ horas, alCambiar }: { horas: number; alCambiar: (h: number) => 
   )
 }
 
-function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Grupo({ titulo, acento, children }: { titulo: string; acento: Acento; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium tracking-wide text-slate-500 uppercase">{titulo}</h3>
+      <h3 className="mb-2.5 flex items-center gap-2 text-xs font-bold tracking-wider text-slate-500 uppercase">
+        <span className={`h-1.5 w-5 rounded-full bg-linear-to-r ${acentos[acento]}`} />
+        {titulo}
+      </h3>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
     </div>
   )
 }
 
-function Dato({ titulo, valor, color }: { titulo: string; valor: number | string | undefined; color?: string }) {
+interface PropsDato {
+  titulo: string
+  valor: number | string | undefined
+  acento: Acento
+  i: number
+  alerta?: boolean
+  pequeno?: boolean
+}
+
+function Dato({ titulo, valor, acento, i, alerta, pequeno }: PropsDato) {
+  const numero = useContador(typeof valor === 'number' ? valor : undefined)
+  const mostrado = typeof valor === 'number' ? numero : valor
   return (
-    <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-      <p className="text-sm text-slate-500">{titulo}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${color ?? 'text-slate-900'}`}>{valor ?? '—'}</p>
+    <div
+      className={`vidrio group relative animate-brotar overflow-hidden rounded-2xl p-4 transition duration-500 ease-suave hover:-translate-y-1 ${
+        alerta ? 'ring-2 ring-ambar/60' : ''
+      }`}
+      style={{ animationDelay: `${i * 60}ms` }}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-x-0 top-0 h-1 origin-left bg-linear-to-r ${acentos[acento]} transition-transform duration-500 ease-suave group-hover:scale-y-150`}
+      />
+      <p className="text-sm font-medium text-slate-500">{titulo}</p>
+      <p className={`mt-1 font-extrabold tracking-tight tabular-nums ${pequeno ? 'text-lg leading-8' : 'text-3xl'}`}>
+        {mostrado ?? '—'}
+      </p>
     </div>
   )
 }
 
-function Lista({ titulo, filas }: { titulo: string; filas: [string, number][] | null }) {
+function Lista({ titulo, acento, filas }: { titulo: string; acento: Acento; filas: [string, number][] | null }) {
   const maximo = Math.max(1, ...(filas ?? []).map(([, v]) => v))
   return (
-    <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-      <h3 className="mb-3 font-medium">{titulo}</h3>
+    <div className="vidrio rounded-2xl p-5">
+      <h3 className="mb-4 font-bold">{titulo}</h3>
       {filas?.length === 0 && <p className="text-sm text-slate-400">Sin datos en este periodo.</p>}
-      <ul className="flex flex-col gap-2 text-sm">
-        {filas?.map(([nombre, valor]) => (
-          <li key={nombre} className="grid grid-cols-[1fr_auto] items-center gap-x-3">
-            <span>{nombre}</span>
-            <span className="tabular-nums text-slate-600">{valor}</span>
-            <span className="col-span-2 h-1.5 rounded bg-slate-100">
-              <span className="block h-1.5 rounded bg-teal-600" style={{ width: `${(valor / maximo) * 100}%` }} />
+      <ul className="flex flex-col gap-3 text-sm">
+        {filas?.map(([nombre, valor], i) => (
+          <li key={nombre} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5">
+            <span className="font-medium">{nombre}</span>
+            <span className="font-bold text-slate-600 tabular-nums">{valor}</span>
+            <span className="col-span-2 h-2 overflow-hidden rounded-full bg-slate-100">
+              <span
+                className={`block h-2 origin-left animate-crecer rounded-full bg-linear-to-r ${acentos[acento]} transition-[width] duration-700 ease-suave`}
+                style={{ width: `${(valor / maximo) * 100}%`, animationDelay: `${i * 80}ms` }}
+              />
             </span>
           </li>
         ))}

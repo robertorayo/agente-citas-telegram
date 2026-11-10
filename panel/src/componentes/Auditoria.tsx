@@ -19,20 +19,39 @@ const nombres: Record<string, string> = {
 
 const avisos = new Set(['urgencia_detectada', 'fallo_ia', 'limite_superado', 'consejo_medico_rechazado'])
 
+// Color del punto de la línea de tiempo según el tipo de evento.
+function color(tipo: string) {
+  if (avisos.has(tipo)) return 'bg-ambar text-ambar'
+  if (tipo.startsWith('cita_')) return 'bg-cian text-cian'
+  if (tipo === 'traspaso_a_humano' || tipo === 'mensaje_operador' || tipo === 'devuelta_al_bot') return 'bg-coral text-coral'
+  if (tipo === 'herramienta' || tipo === 'respuesta_ia') return 'bg-violeta text-violeta'
+  return 'bg-rosa text-rosa'
+}
+
 export function Auditoria() {
   const { datos } = useSondeo(api.eventos, 6000)
   return (
-    <section className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="font-semibold">Registro de auditoría</h2>
+    <section className="vidrio overflow-hidden rounded-2xl">
+      <div className="border-b border-slate-200/70 px-5 py-4">
+        <h2 className="font-bold">Registro de auditoría</h2>
         <p className="text-xs text-slate-500">Cada acción del asistente, de los usuarios y de los operadores.</p>
       </div>
-      <ul className="divide-y divide-slate-100 text-sm">
-        {datos?.length === 0 && <li className="px-4 py-6 text-center text-slate-400">Sin eventos todavía.</li>}
-        {datos?.map((e) => (
-          <li key={e.id} className="grid gap-1 px-4 py-2 sm:grid-cols-[130px_220px_1fr] sm:gap-4">
+      <ul className="relative px-5 py-3 text-sm before:absolute before:top-5 before:bottom-5 before:left-[27px] before:w-px before:bg-linear-to-b before:from-rosa/40 before:via-violeta/30 before:to-cian/40">
+        {datos?.length === 0 && <li className="py-6 text-center text-slate-400">Sin eventos todavía.</li>}
+        {datos?.map((e, i) => (
+          <li
+            key={e.id}
+            className="relative grid animate-brotar gap-1 rounded-xl py-2.5 pr-2 pl-8 transition-colors hover:bg-white/70 sm:grid-cols-[130px_220px_1fr] sm:gap-4"
+            style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute top-[15px] left-[3px] size-2.5 rounded-full ring-4 ring-white ${color(e.tipo)} ${
+                avisos.has(e.tipo) && i < 3 ? 'animate-latido' : ''
+              }`}
+            />
             <span className="text-slate-400 tabular-nums">{fechaHora(e.fecha)}</span>
-            <span className={avisos.has(e.tipo) ? 'font-medium text-amber-700' : 'font-medium'}>
+            <span className={avisos.has(e.tipo) ? 'font-bold text-amber-700' : 'font-semibold'}>
               {nombres[e.tipo] ?? e.tipo}
             </span>
             <code className="truncate text-xs text-slate-500" title={JSON.stringify(e.detalle)}>
