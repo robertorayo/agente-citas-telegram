@@ -45,8 +45,8 @@
     '.ca-caja.ca-abierta{display:flex}',
     '.ca-cab{position:relative;overflow:hidden;background:' + ALBA + ';color:#fff;padding:18px 16px 18px 18px;display:flex;gap:12px;align-items:center}',
     '.ca-cab::before{content:"";position:absolute;width:180px;height:180px;right:-60px;top:-90px;border-radius:50%;background:rgba(255,255,255,.14)}',
-    '.ca-avatar{position:relative;flex:none;width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.22);display:grid;place-items:center}',
-    '.ca-avatar svg{width:22px;height:22px}',
+    '.ca-avatar{position:relative;flex:none;width:40px;height:40px;border-radius:14px;background:#fff;display:grid;place-items:center}',
+    '.ca-avatar img{width:32px;height:32px}',
     '.ca-avatar::after{content:"";position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:#10c98f;border:2px solid #ff3d8b}',
     '.ca-titulo{flex:1;min-width:0}',
     '.ca-cab b{display:block;font-size:15.5px}.ca-cab small{opacity:.9;font-size:12.5px}',
@@ -129,7 +129,8 @@
   }
   var ICONO_CHAT = ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z'];
   var ICONO_CERRAR = ['M6 6l12 12M18 6 6 18'];
-  var ICONO_SOL = ['M5 16a7 7 0 0 1 14 0M12 4v2.5M5.6 7.6l1.7 1.7M18.4 7.6l-1.7 1.7M3 19h18'];
+  // Logo de la clínica (amanecer con cruz), el mismo que el favicon del panel.
+  var LOGO = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E %3Cdefs%3E %3ClinearGradient id=%22ca-sol%22 gradientUnits=%22userSpaceOnUse%22 x1=%220%22 y1=%2211%22 x2=%220%22 y2=%2237%22%3E %3Cstop offset=%220%22 stop-color=%22%23ffe08a%22/%3E %3Cstop offset=%22.3%22 stop-color=%22%23ffbf6e%22/%3E %3Cstop offset=%22.62%22 stop-color=%22%23ff8f78%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ff4f8f%22/%3E %3C/linearGradient%3E %3CradialGradient id=%22ca-halo%22 gradientUnits=%22userSpaceOnUse%22 cx=%2224%22 cy=%2234%22 r=%2224%22%3E %3Cstop offset=%22.6%22 stop-color=%22%23ffb36b%22 stop-opacity=%22.45%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ffb36b%22 stop-opacity=%220%22/%3E %3C/radialGradient%3E %3ClinearGradient id=%22ca-horizonte%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E %3Cstop offset=%220%22 stop-color=%22%23ff3d8b%22/%3E %3Cstop offset=%221%22 stop-color=%22%237c4dff%22/%3E %3C/linearGradient%3E %3CclipPath id=%22ca-cielo%22%3E%3Cpath d=%22M0 0H48V39Q24 31 0 39Z%22/%3E%3C/clipPath%3E %3C/defs%3E %3Cg clip-path=%22url%28%23ca-cielo%29%22%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2224%22 fill=%22url%28%23ca-halo%29%22/%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2221%22 fill=%22url%28%23ca-sol%29%22/%3E %3C/g%3E %3Cpath d=%22M1 40Q24 30.6 47 40Q24 35.2 1 40Z%22 fill=%22url%28%23ca-horizonte%29%22/%3E %3Cpath d=%22M22.1 18h3.8v5h5v3.8h-5v5h-3.8v-5h-5V23h5z%22 fill=%22%23ff3d8b%22 stroke=%22%23fff%22 stroke-width=%221.4%22 stroke-linejoin=%22round%22 paint-order=%22stroke%22/%3E%3C/svg%3E';
   var ICONO_ENVIAR = ['M3.4 20.4 21 12 3.4 3.6l2.2 7.2L14 12l-8.4 1.2Z'];
 
   var boton = el('button', 'ca-boton');
@@ -145,7 +146,10 @@
   caja.setAttribute('aria-label', 'Chat de citas');
   var cab = el('div', 'ca-cab');
   var avatar = el('span', 'ca-avatar');
-  avatar.appendChild(icono(ICONO_SOL));
+  var logo = el('img');
+  logo.src = LOGO;
+  logo.alt = '';
+  avatar.appendChild(logo);
   var titulo = el('div', 'ca-titulo');
   titulo.appendChild(el('b', '', 'Asistente de Clínica Alba'));
   titulo.appendChild(el('small', '', 'Citas · respuesta automática'));

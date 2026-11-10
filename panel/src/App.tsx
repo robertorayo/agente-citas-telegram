@@ -93,18 +93,8 @@ function Acceso({ alEntrar }: { alEntrar: () => void }) {
 function Marca() {
   return (
     <a href="/" className="flex items-center gap-2.5" title="Ir a la web de la clínica">
-      <svg viewBox="0 0 40 40" className="size-9 shrink-0" aria-hidden="true">
-        <defs>
-          <linearGradient id="g-marca" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#ff6b5b" />
-            <stop offset=".5" stopColor="#ff3d8b" />
-            <stop offset="1" stopColor="#7c4dff" />
-          </linearGradient>
-        </defs>
-        <rect width="40" height="40" rx="12" fill="url(#g-marca)" />
-        <path d="M10 27a10 10 0 0 1 20 0" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-        <path d="M20 9v4M10.5 13.5l2.6 2.6M29.5 13.5l-2.6 2.6M8 30h24" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-      </svg>
+      {/* El logo es el mismo archivo que el favicon (public/favicon.svg). */}
+      <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-11 shrink-0" />
       <span className="text-lg font-extrabold tracking-tight">Clínica Alba</span>
       <span className="rounded-full bg-tinta px-2 py-0.5 text-[10px] font-bold tracking-wider text-white uppercase">demo</span>
     </a>

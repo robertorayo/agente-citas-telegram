@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Clínica Alba: centro médico ficticio para demostrar un agente de citas con IA por chat web y Telegram.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E %3Cdefs%3E %3ClinearGradient id=%22ca-sol%22 gradientUnits=%22userSpaceOnUse%22 x1=%220%22 y1=%2211%22 x2=%220%22 y2=%2237%22%3E %3Cstop offset=%220%22 stop-color=%22%23ffe08a%22/%3E %3Cstop offset=%22.3%22 stop-color=%22%23ffbf6e%22/%3E %3Cstop offset=%22.62%22 stop-color=%22%23ff8f78%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ff4f8f%22/%3E %3C/linearGradient%3E %3CradialGradient id=%22ca-halo%22 gradientUnits=%22userSpaceOnUse%22 cx=%2224%22 cy=%2234%22 r=%2224%22%3E %3Cstop offset=%22.6%22 stop-color=%22%23ffb36b%22 stop-opacity=%22.45%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ffb36b%22 stop-opacity=%220%22/%3E %3C/radialGradient%3E %3ClinearGradient id=%22ca-horizonte%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E %3Cstop offset=%220%22 stop-color=%22%23ff3d8b%22/%3E %3Cstop offset=%221%22 stop-color=%22%237c4dff%22/%3E %3C/linearGradient%3E %3CclipPath id=%22ca-cielo%22%3E%3Cpath d=%22M0 0H48V39Q24 31 0 39Z%22/%3E%3C/clipPath%3E %3C/defs%3E %3Cg clip-path=%22url%28%23ca-cielo%29%22%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2224%22 fill=%22url%28%23ca-halo%29%22/%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2221%22 fill=%22url%28%23ca-sol%29%22/%3E %3C/g%3E %3Cpath d=%22M1 40Q24 30.6 47 40Q24 35.2 1 40Z%22 fill=%22url%28%23ca-horizonte%29%22/%3E %3Cpath d=%22M22.1 18h3.8v5h5v3.8h-5v5h-3.8v-5h-5V23h5z%22 fill=%22%23ff3d8b%22 stroke=%22%23fff%22 stroke-width=%221.4%22 stroke-linejoin=%22round%22 paint-order=%22stroke%22/%3E%3C/svg%3E">
   <meta name="theme-color" content="#ff3d8b">
   <title>Clínica Alba · Demo de agente de citas</title>
   <style>
@@ -33,7 +34,7 @@
     }
     header .envoltura { display: flex; align-items: center; justify-content: space-between; height: 66px; gap: 16px; }
     .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; text-decoration: none; letter-spacing: -.01em; }
-    .marca svg { width: 36px; height: 36px; flex: none; }
+    .marca svg { width: 42px; height: 42px; flex: none; }
     nav { display: flex; align-items: center; gap: 6px; font-size: 15px; }
     nav a { text-decoration: none; padding: 8px 12px; border-radius: 10px; color: var(--gris); transition: color .2s, background .2s; }
     nav a:hover { color: var(--tinta); background: rgba(124, 77, 255, .08); }
@@ -87,8 +88,8 @@
       box-shadow: var(--sombra), 0 2px 0 rgba(255,255,255,.8) inset;
     }
     .movil-cab { display: flex; align-items: center; gap: 12px; padding: 10px 12px 14px; }
-    .avatar { position: relative; width: 42px; height: 42px; border-radius: 14px; background: var(--alba); display: grid; place-items: center; flex: none; }
-    .avatar svg { width: 24px; height: 24px; }
+    .avatar { position: relative; width: 42px; height: 42px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--linea); display: grid; place-items: center; flex: none; }
+    .avatar img { width: 34px; height: 34px; }
     .avatar::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--verde); border: 2px solid #fff; }
     .movil-cab b { display: block; font-size: 15px; }
     .movil-cab small { color: var(--gris); font-size: 12.5px; }
@@ -241,12 +242,7 @@
   <header>
     <div class="envoltura">
       <a class="marca" href="/">
-        <svg viewBox="0 0 40 40" aria-hidden="true">
-          <defs><linearGradient id="g-marca" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b5b"/><stop offset=".5" stop-color="#ff3d8b"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs>
-          <rect width="40" height="40" rx="12" fill="url(#g-marca)"/>
-          <path d="M10 27a10 10 0 0 1 20 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-          <path d="M20 9v4M10.5 13.5l2.6 2.6M29.5 13.5l-2.6 2.6M8 30h24" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-        </svg>
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"> <defs> <linearGradient id="ca-sol" gradientUnits="userSpaceOnUse" x1="0" y1="11" x2="0" y2="37"> <stop offset="0" stop-color="#ffe08a"/> <stop offset=".3" stop-color="#ffbf6e"/> <stop offset=".62" stop-color="#ff8f78"/> <stop offset="1" stop-color="#ff4f8f"/> </linearGradient> <radialGradient id="ca-halo" gradientUnits="userSpaceOnUse" cx="24" cy="34" r="24"> <stop offset=".6" stop-color="#ffb36b" stop-opacity=".45"/> <stop offset="1" stop-color="#ffb36b" stop-opacity="0"/> </radialGradient> <linearGradient id="ca-horizonte" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#ff3d8b"/> <stop offset="1" stop-color="#7c4dff"/> </linearGradient> <clipPath id="ca-cielo"><path d="M0 0H48V39Q24 31 0 39Z"/></clipPath> </defs> <g clip-path="url(#ca-cielo)"> <circle cx="24" cy="35" r="24" fill="url(#ca-halo)"/> <circle cx="24" cy="35" r="21" fill="url(#ca-sol)"/> </g> <path d="M1 40Q24 30.6 47 40Q24 35.2 1 40Z" fill="url(#ca-horizonte)"/> <path d="M22.1 18h3.8v5h5v3.8h-5v5h-3.8v-5h-5V23h5z" fill="#ff3d8b" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/></svg>
         Clínica Alba
       </a>
       <nav aria-label="Principal">
@@ -288,8 +284,7 @@
 
         <figure class="movil">
           <div class="movil-cab">
-            <div class="avatar" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M5 16a7 7 0 0 1 14 0M12 4v2.5M5.6 7.6l1.7 1.7M18.4 7.6l-1.7 1.7M3 19h18"/></svg>
+            <div class="avatar" aria-hidden="true"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E %3Cdefs%3E %3ClinearGradient id=%22ca-sol%22 gradientUnits=%22userSpaceOnUse%22 x1=%220%22 y1=%2211%22 x2=%220%22 y2=%2237%22%3E %3Cstop offset=%220%22 stop-color=%22%23ffe08a%22/%3E %3Cstop offset=%22.3%22 stop-color=%22%23ffbf6e%22/%3E %3Cstop offset=%22.62%22 stop-color=%22%23ff8f78%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ff4f8f%22/%3E %3C/linearGradient%3E %3CradialGradient id=%22ca-halo%22 gradientUnits=%22userSpaceOnUse%22 cx=%2224%22 cy=%2234%22 r=%2224%22%3E %3Cstop offset=%22.6%22 stop-color=%22%23ffb36b%22 stop-opacity=%22.45%22/%3E %3Cstop offset=%221%22 stop-color=%22%23ffb36b%22 stop-opacity=%220%22/%3E %3C/radialGradient%3E %3ClinearGradient id=%22ca-horizonte%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E %3Cstop offset=%220%22 stop-color=%22%23ff3d8b%22/%3E %3Cstop offset=%221%22 stop-color=%22%237c4dff%22/%3E %3C/linearGradient%3E %3CclipPath id=%22ca-cielo%22%3E%3Cpath d=%22M0 0H48V39Q24 31 0 39Z%22/%3E%3C/clipPath%3E %3C/defs%3E %3Cg clip-path=%22url%28%23ca-cielo%29%22%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2224%22 fill=%22url%28%23ca-halo%29%22/%3E %3Ccircle cx=%2224%22 cy=%2235%22 r=%2221%22 fill=%22url%28%23ca-sol%29%22/%3E %3C/g%3E %3Cpath d=%22M1 40Q24 30.6 47 40Q24 35.2 1 40Z%22 fill=%22url%28%23ca-horizonte%29%22/%3E %3Cpath d=%22M22.1 18h3.8v5h5v3.8h-5v5h-3.8v-5h-5V23h5z%22 fill=%22%23ff3d8b%22 stroke=%22%23fff%22 stroke-width=%221.4%22 stroke-linejoin=%22round%22 paint-order=%22stroke%22/%3E%3C/svg%3E" alt="">
             </div>
             <div><b>Asistente de Clínica Alba</b><small>Respuesta automática</small></div>
           </div>
