@@ -6,6 +6,7 @@ núcleo de conversación, que decide si responde la IA, una regla de seguridad o
 
 import contextlib
 import logging
+import re
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -17,7 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from . import agenda
 from .agenda import ErrorAgenda
 from .guardarrailes import LimitadorUso
-from .nucleo import NOMBRE_CENTRO, Nucleo
+from .nucleo import NOMBRE_CENTRO, Aviso, Nucleo
 
 log = logging.getLogger(__name__)
 
@@ -41,14 +42,42 @@ def _volver(kb: InlineKeyboardBuilder) -> InlineKeyboardBuilder:
     return kb
 
 
-class CanalTelegram:
-    """Envía mensajes por Telegram. Lo usa el panel para las respuestas del operador."""
+# Marca que llevan los avisos al operador para saber a qué conversación responde.
+# Solo vale al final del aviso: el nombre o el mensaje del paciente podrían incluir un "#c..." falso.
+MARCA_CONVERSACION = re.compile(r"#c(-?\d+)\s*\Z")
+NOMBRE_CANAL = {"telegram": "Telegram", "web": "chat web"}
 
-    def __init__(self, bot: Bot):
-        self.bot = bot
 
-    async def enviar(self, chat_id: int, texto: str, con_menu: bool = False) -> None:
-        await self.bot.send_message(chat_id, texto, reply_markup=menu() if con_menu else None)
+def texto_aviso(aviso: Aviso, url_panel: str = "") -> str:
+    lineas = [
+        "🔔 Conversación pasada a una persona",
+        f"Paciente: {aviso.nombre} ({NOMBRE_CANAL.get(aviso.canal, aviso.canal)})",
+        f"Motivo: {aviso.motivo}",
+    ]
+    if aviso.ultimo:
+        lineas.append(f"Último mensaje: «{aviso.ultimo[:300]}»")
+    lineas += ["", "Responde a este mensaje para contestarle, o responde /devolver para devolverlo al asistente."]
+    if url_panel:
+        lineas.append(f"Panel: {url_panel}")
+    lineas.append(f"#c{aviso.chat_id}")
+    return "\n".join(lineas)
+
+
+def conectar(nucleo: Nucleo, bot: Bot) -> None:
+    """Da al núcleo la forma de enviar por Telegram y de avisar al operador."""
+
+    async def enviar(chat_id: int, texto: str, con_menu: bool = False) -> None:
+        await bot.send_message(chat_id, texto, reply_markup=menu() if con_menu else None)
+
+    nucleo.enviar_telegram = enviar
+    operador = nucleo.ajustes.operador_chat_id
+    if operador:
+        url = nucleo.ajustes.url_publica.rstrip("/")
+
+        async def avisar(aviso: Aviso) -> None:
+            await bot.send_message(operador, texto_aviso(aviso, f"{url}/panel/" if url else ""))
+
+        nucleo.avisar_operador = avisar
 
 
 def crear_dispatcher(nucleo: Nucleo) -> Dispatcher:
@@ -69,6 +98,30 @@ def crear_dispatcher(nucleo: Nucleo) -> Dispatcher:
 
     def nombre_de(usuario) -> str:
         return (usuario.full_name if usuario else "") or "Sin nombre"
+
+    operador = nucleo.ajustes.operador_chat_id
+
+    def es_respuesta_a_aviso(m: Message) -> bool:
+        r = m.reply_to_message
+        return bool(operador and m.chat.id == operador and r and r.from_user and r.from_user.is_bot
+                    and r.text and MARCA_CONVERSACION.search(r.text))
+
+    @router.message(F.text, es_respuesta_a_aviso)
+    async def respuesta_operador(m: Message):
+        """El operador responde a un aviso desde su Telegram: se reenvía al paciente."""
+        chat_id = int(MARCA_CONVERSACION.search(m.reply_to_message.text).group(1))
+        try:
+            if m.text.strip().lower() == "/devolver":
+                await nucleo.devolver_al_bot(chat_id)
+                await m.reply("Hecho: la conversación vuelve al asistente.")
+            else:
+                await nucleo.mensaje_operador(chat_id, m.text)
+                await m.reply("Enviado ✓")
+        except (LookupError, ConnectionError, TelegramAPIError) as e:
+            await m.reply(f"No se ha podido: {e}")
+        except Exception:
+            log.exception("Fallo al procesar la respuesta del operador")
+            await m.reply("Ha fallado algo al guardar. Revisa el panel antes de volver a enviarlo.")
 
     @router.message(CommandStart())
     @router.message(Command("menu"))

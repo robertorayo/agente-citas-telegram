@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Clínica Alba: centro médico ficticio para demostrar un agente de citas con IA por chat web y Telegram.">
+  <title>Clínica Alba · Demo de agente de citas</title>
+  <style>
+    :root { --verde: #0f766e; --verde-osc: #115e59; --tinta: #0f172a; --gris: #475569; --fondo: #f8fafc; --linea: #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--tinta); background: #fff; }
+    a { color: var(--verde); }
+    .envoltura { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+    .aviso { background: #fef3c7; color: #78350f; font-size: 14px; text-align: center; padding: 8px 16px; }
+    header { border-bottom: 1px solid var(--linea); }
+    header .envoltura { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+    .marca span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--verde); color: #fff; font-size: 14px; }
+    .hero { background: linear-gradient(160deg, #f0fdfa, #fff 60%); padding: 72px 0 56px; }
+    .hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.15; margin: 0 0 16px; max-width: 640px; }
+    .hero p { color: var(--gris); max-width: 560px; margin: 0 0 28px; font-size: 18px; }
+    .botones { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--verde); }
+    .btn-lleno { background: var(--verde); color: #fff; }
+    .btn-lleno:hover { background: var(--verde-osc); }
+    section { padding: 56px 0; }
+    h2 { font-size: 26px; margin: 0 0 24px; }
+    .rejilla { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .tarjeta { border: 1px solid var(--linea); border-radius: 14px; padding: 20px; background: #fff; }
+    .tarjeta h3 { margin: 0 0 6px; font-size: 18px; }
+    .tarjeta p { margin: 0; color: var(--gris); }
+    .gris { background: var(--fondo); }
+    .pasos { counter-reset: paso; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+    .pasos li { counter-increment: paso; padding-left: 44px; position: relative; color: var(--gris); }
+    .pasos li::before { content: counter(paso); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--verde); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+    .pasos b { color: var(--tinta); }
+    footer { border-top: 1px solid var(--linea); padding: 24px 0 96px; color: var(--gris); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <p class="aviso">Centro ficticio de demostración. No introduzcas datos médicos ni personales reales.</p>
+
+  <header>
+    <div class="envoltura">
+      <div class="marca"><span>CA</span> Clínica Alba</div>
+      <a href="/panel/">Panel de recepción</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="envoltura">
+        <h1>Pide tu cita en un minuto, por chat o por Telegram.</h1>
+        <p>Nuestro asistente consulta los huecos libres, reserva y cancela citas. Si lo necesitas, te pasa con una persona de recepción.</p>
+        <div class="botones">
+          <a class="btn btn-lleno" href="#" id="abrir-chat">Abrir el chat</a>
+          <a class="btn" href="https://t.me/turnos_demobot" target="_blank" rel="noopener noreferrer">Escribir por Telegram</a>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div class="envoltura">
+        <h2>Servicios</h2>
+        <div class="rejilla">
+          <div class="tarjeta"><h3>Medicina general</h3><p>Consultas de 20 minutos.</p></div>
+          <div class="tarjeta"><h3>Fisioterapia</h3><p>Sesiones de 45 minutos.</p></div>
+          <div class="tarjeta"><h3>Odontología</h3><p>Consultas de 30 minutos.</p></div>
+          <div class="tarjeta"><h3>Horario</h3><p>De lunes a viernes, de 9:00 a 14:00 y de 16:00 a 19:00.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gris">
+      <div class="envoltura">
+        <h2>Cómo probar la demo</h2>
+        <ol class="pasos">
+          <li><b>Pide una cita</b> en el chat de abajo a la derecha, escribiendo con normalidad: «¿Tenéis hueco para fisio el jueves por la tarde?».</li>
+          <li><b>Consulta o cancela</b> tus citas: «¿Qué citas tengo?».</li>
+          <li><b>Pide hablar con una persona.</b> El asistente deja de responder y la conversación aparece en el panel de recepción, desde donde responde el equipo.</li>
+          <li><b>Prueba los límites:</b> pide un consejo médico o escribe una urgencia y verás cómo responde el asistente.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="envoltura">
+      Demo técnica: el mismo asistente atiende el chat web y Telegram, y las conversaciones de ambos canales llegan al mismo panel.
+    </div>
+  </footer>
+
+  <script src="/widget.js" defer></script>
+  <script>
+    document.getElementById('abrir-chat').addEventListener('click', function (e) {
+      e.preventDefault();
+      var boton = document.querySelector('.ca-boton');
+      if (boton && boton.getAttribute('aria-expanded') !== 'true') boton.click();
+    });
+  </script>
+</body>
+</html>

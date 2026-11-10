@@ -46,6 +46,11 @@ class Modo(StrEnum):
     HUMANO = "humano"
 
 
+class Canal(StrEnum):
+    TELEGRAM = "telegram"
+    WEB = "web"
+
+
 class Autor(StrEnum):
     USUARIO = "usuario"
     BOT = "bot"
@@ -85,6 +90,9 @@ class Conversacion(Base):
 
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120))
+    canal: Mapped[str] = mapped_column(String(10), default=Canal.TELEGRAM)
+    # Solo en el canal web: identifica al visitante sin pedirle datos personales.
+    token_web: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     modo: Mapped[str] = mapped_column(String(10), default=Modo.BOT)
     motivo_traspaso: Mapped[str | None] = mapped_column(String(300), nullable=True)
     actualizada: Mapped[datetime] = mapped_column(FechaUTC, default=ahora_utc)

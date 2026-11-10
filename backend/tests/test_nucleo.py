@@ -68,6 +68,15 @@ async def test_el_modelo_no_puede_cancelar_citas_ajenas(sesiones):
 
 async def test_traspaso_a_humano_y_silencio_del_bot(sesiones):
     n = nucleo(sesiones, ModeloSimulado())
+    enviados, avisos = [], []
+
+    async def enviar(chat_id, texto, con_menu):
+        enviados.append((chat_id, texto))
+
+    async def avisar(aviso):
+        avisos.append(aviso)
+
+    n.enviar_telegram, n.avisar_operador = enviar, avisar
     r = await n.procesar(7, "Ana", "Quiero hablar con una persona")
     assert r.traspasada and r.texto == AVISO_TRASPASO
 
@@ -80,7 +89,12 @@ async def test_traspaso_a_humano_y_silencio_del_bot(sesiones):
         conv = await s.get(Conversacion, 7)
         autores = [m.autor for m in await s.scalars(select(Mensaje).order_by(Mensaje.id))]
     assert conv.modo == Modo.BOT
-    assert autores == ["usuario", "bot", "usuario", "operador"]
+    assert autores == ["usuario", "bot", "usuario", "operador", "bot"]
+    # El operador recibió un único aviso, con el último mensaje del paciente.
+    assert len(avisos) == 1 and avisos[0].ultimo == "Quiero hablar con una persona"
+    # Al paciente le llegaron la respuesta firmada y el aviso de vuelta al asistente.
+    assert "Soy Marta" in enviados[0][1] or "soy Marta" in enviados[0][1]
+    assert len(enviados) == 2
 
 
 async def test_el_modelo_puede_pedir_el_traspaso(sesiones):
@@ -155,6 +169,11 @@ async def test_si_la_ia_falla_tras_reservar_se_confirma_la_cita(sesiones):
 async def test_si_el_operador_interviene_el_bot_no_responde(sesiones):
     n = nucleo(sesiones, None)
 
+    async def enviar(chat_id, texto, con_menu):
+        pass
+
+    n.enviar_telegram = enviar
+
     class OperadorEntraEnMedio:
         async def completar(self, mensajes, herramientas):
             await n.mensaje_operador(7, "Ya te atiendo yo")
@@ -171,3 +190,36 @@ async def test_mensajes_simultaneos_de_un_chat_nuevo(sesiones):
     n = nucleo(sesiones, None)
     respuestas = await asyncio.gather(n.procesar(8, "Eva", "hola"), n.procesar(8, "Eva", "hola"))
     assert all(r.texto for r in respuestas)
+
+
+async def test_sin_telegram_conectado_no_se_puede_responder_a_un_chat_de_telegram(sesiones):
+    n = nucleo(sesiones, None)
+    await n.procesar(7, "Ana", "Quiero hablar con una persona")
+    import pytest
+
+    with pytest.raises(ConnectionError):
+        await n.mensaje_operador(7, "hola")
+
+
+async def test_un_fallo_al_avisar_no_deja_al_paciente_sin_respuesta(sesiones):
+    n = nucleo(sesiones, None)
+
+    async def avisar_roto(aviso):
+        raise RuntimeError("Telegram caído")
+
+    n.avisar_operador = avisar_roto
+    r = await n.procesar(7, "Ana", "Quiero hablar con una persona")
+    assert r.traspasada and r.texto
+
+
+async def test_canal_web(sesiones):
+    n = nucleo(sesiones, None)
+    token = await n.crear_sesion_web()
+    conv = await n.conversacion_web(token)
+    assert conv.canal == "web" and conv.chat_id < 0
+    assert await n.conversacion_web("otro") is None
+
+    await n.procesar(conv.chat_id, conv.nombre, "Quiero hablar con una persona")
+    await n.mensaje_operador(conv.chat_id, "Hola, te atiendo")  # en la web no hace falta Telegram
+    textos = [m.texto for m in await n.mensajes_desde(conv.chat_id)]
+    assert textos[-1] == "Hola, te atiendo"

@@ -1,5 +1,7 @@
 """Conexión a la base de datos, creación de tablas y datos iniciales."""
 
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
@@ -12,8 +14,23 @@ SERVICIOS_INICIALES = [
 ]
 
 
+def url_async(url: str) -> str:
+    """Adapta la URL que dan los proveedores (postgres://...?sslmode=require) al driver asyncpg."""
+    if url.startswith(("postgres://", "postgresql://")):
+        partes = urlsplit(url)
+        consulta = [(k, v) for k, v in parse_qsl(partes.query) if k not in ("sslmode", "channel_binding")]
+        if dict(parse_qsl(partes.query)).get("sslmode") in ("require", "verify-full", "verify-ca"):
+            consulta.append(("ssl", "require"))
+        url = urlunsplit(("postgresql+asyncpg", partes.netloc, partes.path, urlencode(consulta), ""))
+    return url
+
+
 def crear_motor(url: str) -> AsyncEngine:
-    return create_async_engine(url)
+    url = url_async(url)
+    if url.startswith("sqlite"):
+        return create_async_engine(url)
+    # pool_pre_ping: los proveedores gratuitos cierran las conexiones cuando la base de datos se suspende.
+    return create_async_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=5)
 
 
 def crear_sesiones(motor: AsyncEngine) -> async_sessionmaker[AsyncSession]:

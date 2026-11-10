@@ -6,7 +6,8 @@ WhatsApp) podría usar este mismo núcleo sin cambiarlo.
 
 import json
 import logging
-from collections.abc import Callable
+import secrets
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -20,7 +21,7 @@ from .agenda import fecha_legible
 from .config import Ajustes
 from .db import registrar
 from .ia import ModeloIA
-from .modelos import Autor, Conversacion, Mensaje, Modo, ahora_utc
+from .modelos import Autor, Canal, Conversacion, Mensaje, Modo, ahora_utc
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,8 @@ AVISO_TRASPASO = "Te paso con una persona del centro. Te escribirá por aquí en
 AVISO_LIMITE = "Has enviado muchos mensajes seguidos. Espera unos minutos y vuelve a escribirme, por favor."
 AVISO_LARGO = "El mensaje es demasiado largo. ¿Puedes resumirlo en unas líneas?"
 AVISO_SIN_IA = "Puedo ayudarte con tus citas desde el menú. Si prefieres, escribe «hablar con una persona»."
+AVISO_DEVUELTA = "Vuelves a hablar con el asistente virtual. ¿En qué más te ayudo?"
+FIRMA_OPERADOR = "— Equipo de la clínica"
 AVISO_FALLO_IA = "Ahora mismo no puedo procesar mensajes escritos. Usa el menú, o escribe «hablar con una persona»."
 
 
@@ -40,6 +43,21 @@ class Respuesta:
     texto: str | None  # None: no se responde (la conversación la lleva una persona)
     mostrar_menu: bool = False
     traspasada: bool = False
+
+
+@dataclass
+class Aviso:
+    """Lo que se envía al operador cuando una conversación pasa a una persona."""
+
+    chat_id: int
+    nombre: str
+    canal: str
+    motivo: str
+    ultimo: str | None
+
+
+EnviarTelegram = Callable[[int, str, bool], Awaitable[None]]  # (chat_id, texto, con_menu)
+AvisarOperador = Callable[[Aviso], Awaitable[None]]
 
 
 def instrucciones(ahora: datetime, tz) -> str:
@@ -73,6 +91,9 @@ class Nucleo:
         self.ajustes = ajustes
         self.reloj = reloj
         self.limitador = gr.LimitadorUso(ajustes.max_mensajes_por_ventana, ajustes.ventana_segundos)
+        # Los pone el adaptador de Telegram al arrancar; sin él, el núcleo funciona igual (p. ej., en los tests).
+        self.enviar_telegram: EnviarTelegram | None = None
+        self.avisar_operador: AvisarOperador | None = None
 
     # ---- Entrada desde el canal ----
 
@@ -133,12 +154,19 @@ class Nucleo:
     # ---- Acciones del operador (panel) ----
 
     async def mensaje_operador(self, chat_id: int, texto: str) -> None:
+        """Respuesta de una persona del centro. En Telegram se envía; en la web, el widget la recoge."""
         async with self.sesiones() as s:
             conv = await s.get(Conversacion, chat_id)
             if conv is None:
                 raise LookupError("Conversación no encontrada")
+            if conv.canal == Canal.TELEGRAM:
+                if self.enviar_telegram is None:
+                    raise ConnectionError("Telegram no está conectado")
+                # Se envía antes de guardar: si Telegram lo rechaza, no queda un mensaje que nadie recibió.
+                await self.enviar_telegram(chat_id, f"{texto}\n\n{FIRMA_OPERADOR}", False)
             if conv.modo == Modo.BOT:  # si el operador interviene, el bot deja de responder
-                await self._traspasar(s, conv, "Intervención del operador")
+                await self._traspasar(s, conv, "Intervención del operador", avisar=False)
+            conv.actualizada = self.reloj()
             await self._guardar(s, chat_id, Autor.OPERADOR, texto)
             await registrar(s, "mensaje_operador", chat_id)
             await s.commit()
@@ -150,7 +178,42 @@ class Nucleo:
                 raise LookupError("Conversación no encontrada")
             conv.modo, conv.motivo_traspaso, conv.actualizada = Modo.BOT, None, self.reloj()
             await registrar(s, "devuelta_al_bot", chat_id)
+            await self._guardar(s, chat_id, Autor.BOT, AVISO_DEVUELTA)
             await s.commit()
+            canal = conv.canal
+        if canal == Canal.TELEGRAM and self.enviar_telegram is not None:
+            try:
+                await self.enviar_telegram(chat_id, AVISO_DEVUELTA, True)
+            except Exception:
+                log.warning("No se pudo avisar por Telegram de la devolución al bot", exc_info=True)
+
+    # ---- Canal web ----
+
+    async def crear_sesion_web(self) -> str:
+        """Crea una conversación web anónima y devuelve el token que el navegador guardará."""
+        async with self.sesiones() as s:
+            token = secrets.token_urlsafe(32)
+            # Identificadores negativos: no coinciden nunca con los chats privados de Telegram, que son positivos.
+            chat_id = -secrets.randbelow(2**52) - 1
+            conv = Conversacion(chat_id=chat_id, nombre=f"Visitante web {str(chat_id)[-4:]}", canal=Canal.WEB,
+                                token_web=token, modo=Modo.BOT, actualizada=self.reloj())
+            s.add(conv)
+            await registrar(s, "conversacion_nueva", chat_id, canal="web")
+            await s.commit()
+            return token
+
+    async def conversacion_web(self, token: str) -> Conversacion | None:
+        if not token:
+            return None
+        async with self.sesiones() as s:
+            return await s.scalar(select(Conversacion).where(Conversacion.token_web == token,
+                                                             Conversacion.canal == Canal.WEB))
+
+    async def mensajes_desde(self, chat_id: int, desde_id: int = 0) -> list[Mensaje]:
+        async with self.sesiones() as s:
+            return list(await s.scalars(
+                select(Mensaje).where(Mensaje.chat_id == chat_id, Mensaje.id > desde_id).order_by(Mensaje.id).limit(100)
+            ))
 
     # ---- Interno ----
 
@@ -195,7 +258,7 @@ class Nucleo:
 
         # Si un operador ha tomado la conversación mientras respondía la IA, el bot ya no contesta.
         await s.refresh(conv, ["modo"])
-        if conv.modo == Modo.HUMANO and not ctx.traspaso:
+        if conv.modo == Modo.HUMANO:
             await s.commit()
             return Respuesta(None)
 
@@ -228,9 +291,16 @@ class Nucleo:
         conv.actualizada = self.reloj()
         return conv
 
-    async def _traspasar(self, s: AsyncSession, conv: Conversacion, motivo: str) -> None:
+    async def _traspasar(self, s: AsyncSession, conv: Conversacion, motivo: str, avisar: bool = True) -> None:
         conv.modo, conv.motivo_traspaso = Modo.HUMANO, motivo
         await registrar(s, "traspaso_a_humano", conv.chat_id, motivo=motivo)
+        if avisar:
+            ultimo = await s.scalar(
+                select(Mensaje.texto).where(Mensaje.chat_id == conv.chat_id, Mensaje.autor == Autor.USUARIO)
+                .order_by(Mensaje.id.desc()).limit(1)
+            )
+            # Se avisa al operador después del commit, desde _responder.
+            s.info["aviso"] = Aviso(conv.chat_id, conv.nombre, conv.canal, motivo, ultimo)
 
     async def _guardar(self, s: AsyncSession, chat_id: int, autor: Autor, texto: str) -> None:
         s.add(Mensaje(chat_id=chat_id, autor=autor, texto=texto, fecha=datetime.now(UTC)))
@@ -240,4 +310,10 @@ class Nucleo:
                          traspasada: bool = False) -> Respuesta:
         await self._guardar(s, chat_id, Autor.BOT, texto)
         await s.commit()
+        aviso = s.info.pop("aviso", None)
+        if aviso and self.avisar_operador:
+            try:
+                await self.avisar_operador(aviso)
+            except Exception:  # un fallo al avisar no debe dejar al paciente sin respuesta
+                log.warning("No se pudo avisar al operador", exc_info=True)
         return Respuesta(texto, mostrar_menu=menu, traspasada=traspasada)

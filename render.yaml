@@ -1,0 +1,25 @@
+# Blueprint de Render: crea el servicio web gratuito a partir del Dockerfile.
+# Los valores marcados con sync: false se rellenan a mano en el panel de Render (son secretos).
+services:
+  - type: web
+    name: agente-citas-telegram
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/salud
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: OPERADOR_CHAT_ID
+        sync: false
+      - key: PANEL_TOKEN
+        generateValue: true
+      - key: WEBHOOK_SECRETO
+        generateValue: true
+      - key: LLM_MODELO
+        value: openai/gpt-oss-120b

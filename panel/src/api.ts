@@ -11,6 +11,7 @@ export interface Resumen {
 export interface Conversacion {
   chat_id: number
   nombre: string
+  canal: 'telegram' | 'web'
   modo: Modo
   motivo: string | null
   actualizada: string

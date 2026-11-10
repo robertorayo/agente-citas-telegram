@@ -41,6 +41,13 @@ export function ListaConversaciones({ conversaciones, seleccionada, alSelecciona
                 <span className="shrink-0 text-xs text-slate-400">{fechaHora(c.actualizada)}</span>
               </div>
               <div className="mt-1 flex items-center gap-2">
+                <span
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                    c.canal === 'web' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {c.canal === 'web' ? 'Web' : 'Telegram'}
+                </span>
                 {c.modo === 'humano' && (
                   <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
                     Espera operador
