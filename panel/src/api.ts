@@ -41,6 +41,30 @@ export interface Evento {
   fecha: string
 }
 
+export interface Metricas {
+  horas: number
+  conversaciones_activas: number
+  por_canal: Partial<Record<'telegram' | 'web', number>>
+  conversaciones_nuevas: number
+  mensajes_de_usuarios: number
+  citas_reservadas: number
+  citas_canceladas: number
+  traspasos: number
+  mensajes_de_operador: number
+  avisos: { urgencias: number; consejo_medico_rechazado: number; limite_superado: number }
+  ia: {
+    respuestas: number
+    fallos: number
+    tasa_de_fallo: number | null
+    ms_media: number | null
+    ms_p50: number | null
+    ms_p95: number | null
+    cortadas: number
+    herramientas: Record<string, number>
+  }
+  eventos_truncados: boolean
+}
+
 export interface Salud {
   ok: boolean
   ia: boolean
@@ -86,4 +110,5 @@ export const api = {
   devolver: (chatId: number) => pedir<{ ok: boolean }>(`/conversaciones/${chatId}/devolver`, { method: 'POST' }),
   citas: () => pedir<Cita[]>('/citas'),
   eventos: () => pedir<Evento[]>('/eventos?limite=80'),
+  metricas: (horas: number) => pedir<Metricas>(`/metricas?horas=${horas}`),
 }

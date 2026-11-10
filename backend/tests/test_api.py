@@ -169,3 +169,74 @@ def test_el_panel_ve_los_mensajes_recientes_de_conversaciones_largas(cliente):
         cliente.portal.call(n.registrar_accion, 7, "Ana", f"accion {i}", f"respuesta {i}")
     textos = [m["texto"] for m in cliente.get("/api/conversaciones/7/mensajes", headers=TOKEN).json()]
     assert textos[-1] == "respuesta 129"
+
+
+def test_metricas(cliente):
+    from agente_citas.ia import RespuestaModelo
+
+    n = cliente.app.state.nucleo
+
+    class Modelo:
+        async def completar(self, mensajes, herramientas):
+            return RespuestaModelo(texto="Hola.")
+
+    n.modelo = Modelo()
+    cliente.portal.call(n.procesar, 7, "Ana", "hola")
+    cliente.portal.call(n.procesar, 7, "Ana", "Quiero hablar con una persona")
+    assert cliente.get("/api/metricas").status_code == 401
+    m = cliente.get("/api/metricas?horas=24", headers=TOKEN).json()
+    assert m["ia"]["respuestas"] == 1 and m["ia"]["fallos"] == 0 and m["ia"]["tasa_de_fallo"] == 0
+    assert m["traspasos"] == 1 and m["mensajes_de_usuarios"] == 2 and m["por_canal"] == {"telegram": 1}
+
+
+def test_percentil():
+    from agente_citas.metricas import percentil
+
+    assert percentil([], 50) is None
+    assert percentil([10, 20, 30, 40], 50) == 20 and percentil(list(range(1, 101)), 95) == 95
+
+
+def test_metricas_respetan_el_periodo_y_la_tasa_de_fallo(tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    from agente_citas.db import crear_motor, crear_sesiones, preparar_bd, registrar
+    from agente_citas.metricas import calcular
+    from agente_citas.modelos import Evento
+
+    async def probar():
+        motor = crear_motor(f"sqlite+aiosqlite:///{tmp_path / 'm.db'}")
+        await preparar_bd(motor)
+        ahora = datetime(2026, 11, 16, 12, tzinfo=UTC)
+        async with crear_sesiones(motor)() as s:
+            s.add(Evento(tipo="respuesta_ia", detalle={"ms": 900}, fecha=ahora - timedelta(hours=30)))  # fuera
+            s.add(Evento(tipo="respuesta_ia", detalle={"ms": 100}, fecha=ahora - timedelta(hours=1)))
+            s.add(Evento(tipo="respuesta_ia", detalle={"ms": 300}, fecha=ahora - timedelta(hours=2)))
+            s.add(Evento(tipo="fallo_ia", detalle={}, fecha=ahora - timedelta(hours=3)))
+            await registrar(s, "cita_reservada")  # con fecha de hoy real, fuera del periodo de prueba
+            await s.commit()
+            m24 = await calcular(s, ahora, 24)
+            m48 = await calcular(s, ahora, 48)
+        await motor.dispose()
+        return m24, m48
+
+    import asyncio
+
+    m24, m48 = asyncio.run(probar())
+    assert m24["ia"]["respuestas"] == 2 and m24["ia"]["fallos"] == 1
+    assert m24["ia"]["tasa_de_fallo"] == round(1 / 3, 3) and m24["ia"]["ms_media"] == 200
+    assert m48["ia"]["respuestas"] == 3 and m24["citas_reservadas"] == 0
+
+
+def test_la_auditoria_no_muestra_las_respuestas_de_la_ia(cliente):
+    from agente_citas.ia import RespuestaModelo
+
+    n = cliente.app.state.nucleo
+
+    class Modelo:
+        async def completar(self, mensajes, herramientas):
+            return RespuestaModelo(texto="Hola.")
+
+    n.modelo = Modelo()
+    cliente.portal.call(n.procesar, 7, "Ana", "hola")
+    tipos = {e["tipo"] for e in cliente.get("/api/eventos", headers=TOKEN).json()}
+    assert "respuesta_ia" not in tipos and "conversacion_nueva" in tipos

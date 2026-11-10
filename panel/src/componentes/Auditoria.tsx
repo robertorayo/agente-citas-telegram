@@ -14,6 +14,7 @@ const nombres: Record<string, string> = {
   consejo_medico_rechazado: 'Consejo médico rechazado',
   limite_superado: 'Límite de mensajes',
   fallo_ia: 'Fallo de la IA',
+  respuesta_ia: 'Respuesta de la IA',
 }
 
 const avisos = new Set(['urgencia_detectada', 'fallo_ia', 'limite_superado', 'consejo_medico_rechazado'])

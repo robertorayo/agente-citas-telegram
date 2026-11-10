@@ -10,6 +10,7 @@ Asistente de citas para un centro médico ficticio (Clínica Alba). Los paciente
 - **Traspaso a una persona:** si el usuario lo pide, si la IA no puede resolverlo o si un operador interviene, el bot deja de responder. El operador recibe un aviso en su Telegram y puede contestar respondiendo a ese aviso (o con `/devolver`, devolverlo al asistente), o hacerlo desde el panel.
 - **Guardarraíles:** detección de posibles urgencias (aviso del 112 y traspaso), rechazo de consejos médicos sin pasar por la IA, límites de mensajes, de pulsaciones y de sesiones web nuevas, solo chats privados en Telegram, y herramientas que solo actúan sobre las citas del propio usuario (el usuario lo pone el servidor, no el modelo).
 - **Auditoría:** cada reserva, cancelación, llamada a herramienta, traspaso y aviso queda registrado y se consulta en el panel.
+- **Observabilidad:** cada respuesta de la IA guarda su duración y sus rondas de herramientas. El panel tiene una pestaña de métricas (actividad por canal, citas, traspasos, tasa de fallo y tiempos media y p95 de la IA, herramientas más usadas y guardarraíles activados) por 24 horas, 7 o 30 días. Si la IA falla, el operador recibe una alerta en Telegram, como mucho una cada 15 minutos.
 - **Reglas de agenda:** lunes a viernes de 9:00 a 14:00 y de 16:00 a 19:00, huecos según la duración de cada servicio, una hora de antelación mínima, hasta 30 días vista, como máximo 2 citas pendientes por persona y sin solapes. Un índice único en la base de datos impide dos reservas en el mismo hueco aunque lleguen a la vez.
 
 ## Arquitectura
@@ -64,6 +65,8 @@ Requisitos: Python con [uv](https://docs.astral.sh/uv/) y Node.js 20 o superior.
 
 Las tablas se crean al arrancar, pero no se migran: si tras actualizar falta alguna columna en local, borra `backend/agente_citas.db`.
 
+Para revisar el panel en local mientras el bot está desplegado, usa `uv run python scripts/servidor_sin_telegram.py` (puerto 8001): no se conecta a Telegram, así que no le quita los mensajes al bot publicado.
+
 Para desarrollar el panel con recarga en caliente: `npm run dev` en `panel/`. Para cargar datos de ejemplo: `uv run python scripts/datos_demo.py`.
 
 ## Despliegue gratuito (Render + Neon)
@@ -93,6 +96,7 @@ backend/
 │   ├── ia.py              interfaz del modelo y cliente compatible con OpenAI
 │   ├── telegram.py        adaptador de Telegram (botones, texto y respuestas del operador)
 │   ├── app.py             APIs, webhook, páginas y arranque del bot
+│   ├── metricas.py        métricas a partir del registro de auditoría
 │   ├── web/               página de la clínica y widget de chat
 │   ├── modelos.py, db.py  tablas y conexión
 │   └── config.py          variables de entorno

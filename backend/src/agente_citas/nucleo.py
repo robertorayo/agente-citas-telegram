@@ -4,9 +4,11 @@ Recibe un mensaje de texto y devuelve qué responder. Telegram es solo un adapta
 WhatsApp) podría usar este mismo núcleo sin cambiarlo.
 """
 
+import asyncio
 import json
 import logging
 import secrets
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -58,6 +60,10 @@ class Aviso:
 
 EnviarTelegram = Callable[[int, str, bool], Awaitable[None]]  # (chat_id, texto, con_menu)
 AvisarOperador = Callable[[Aviso], Awaitable[None]]
+AlertarOperador = Callable[[str], Awaitable[None]]
+
+# Como mucho una alerta de cada tipo cada 15 minutos: si la IA cae, no se inunda el Telegram del operador.
+PAUSA_ENTRE_ALERTAS_S = 15 * 60
 
 
 def instrucciones(ahora: datetime, tz) -> str:
@@ -95,6 +101,9 @@ class Nucleo:
         # Los pone el adaptador de Telegram al arrancar; sin él, el núcleo funciona igual (p. ej., en los tests).
         self.enviar_telegram: EnviarTelegram | None = None
         self.avisar_operador: AvisarOperador | None = None
+        self.alertar_operador: AlertarOperador | None = None
+        self._ultima_alerta: dict[str, float] = {}
+        self._tareas: set[asyncio.Task] = set()
 
     # ---- Entrada desde el canal ----
 
@@ -222,8 +231,10 @@ class Nucleo:
         ahora, tz, chat_id = self.reloj(), self.ajustes.tz, conv.chat_id
         mensajes = [{"role": "system", "content": instrucciones(ahora, tz)}] + await self._historial(s, conv.chat_id)
         ctx = herramientas.Contexto(s, conv.chat_id, conv.nombre, ahora, tz)
+        inicio, rondas = time.perf_counter(), 0
         try:
             for _ in range(MAX_RONDAS_HERRAMIENTAS):
+                rondas += 1
                 r = await self.modelo.completar(mensajes, herramientas.DEFINICIONES)
                 if not r.llamadas:
                     break
@@ -249,13 +260,19 @@ class Nucleo:
                     break
             else:
                 r.texto = None
-        except Exception:
+        except Exception as e:
             log.exception("Fallo del modelo de IA")
             await s.rollback()
-            await registrar(s, "fallo_ia", chat_id)
+            ms = round((time.perf_counter() - inicio) * 1000)
+            await registrar(s, "fallo_ia", chat_id, error=type(e).__name__, ms=ms, rondas=rondas)
+            await self._alertar("fallo_ia", f"⚠️ La IA ha fallado ({type(e).__name__}). El bot responde con el "
+                                            "menú mientras tanto. Revisa los logs de Render y la clave de Groq.")
             if ctx.hechas:  # lo ya reservado o cancelado sigue hecho: se le dice al usuario
                 return await self._responder(s, chat_id, "Hecho: " + "; ".join(ctx.hechas) + ".", menu=True)
             return await self._responder(s, chat_id, AVISO_FALLO_IA, menu=True)
+
+        await registrar(s, "respuesta_ia", chat_id, ms=round((time.perf_counter() - inicio) * 1000),
+                        rondas=rondas, cortada=r.cortada)
 
         # Si un operador ha tomado la conversación mientras respondía la IA, el bot ya no contesta.
         await s.refresh(conv, ["modo"])
@@ -272,6 +289,31 @@ class Nucleo:
             "Perdona, no he podido completar la petición. ¿Lo intentamos con el menú?"
         )
         return await self._responder(s, conv.chat_id, texto)
+
+    async def _alertar(self, tipo: str, texto: str) -> None:
+        """Avisa al operador de un problema del servicio, sin repetir el mismo aviso continuamente.
+
+        Se envía en segundo plano para que el paciente no espere a Telegram justo cuando algo va mal.
+        """
+        ahora = time.monotonic()
+        if self.alertar_operador is None or ahora - self._ultima_alerta.get(tipo, -1e9) < PAUSA_ENTRE_ALERTAS_S:
+            return
+        self._ultima_alerta[tipo] = ahora  # antes de enviar, para que dos fallos seguidos no manden dos alertas
+        tarea = asyncio.create_task(self._enviar_alerta(tipo, texto))
+        self._tareas.add(tarea)
+        tarea.add_done_callback(self._tareas.discard)
+
+    async def _enviar_alerta(self, tipo: str, texto: str) -> None:
+        try:
+            await asyncio.wait_for(self.alertar_operador(texto), timeout=10)
+        except Exception:
+            log.warning("No se pudo enviar la alerta al operador", exc_info=True)
+            self._ultima_alerta.pop(tipo, None)  # si no llegó, el siguiente fallo lo vuelve a intentar
+
+    async def esperar_tareas(self, timeout: float = 10) -> None:
+        """Espera a las alertas pendientes (al apagar el servidor y en los tests)."""
+        if self._tareas:
+            await asyncio.wait(set(self._tareas), timeout=timeout)
 
     async def _historial(self, s: AsyncSession, chat_id: int) -> list[dict]:
         filas = list(await s.scalars(

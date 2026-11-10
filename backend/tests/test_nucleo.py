@@ -265,3 +265,46 @@ def test_el_corte_por_longitud_conserva_las_listas():
     recortada = limpiar(lista)
     assert len(recortada) <= 900 and recortada.count("- Opción") > 30
     assert limpiar("Hay hueco a las 9. Te reservo a las", cortada=True) == "Hay hueco a las 9."
+
+
+async def test_se_mide_cada_respuesta_de_la_ia(sesiones):
+    await nucleo(sesiones, ModeloSimulado(RespuestaModelo(texto="Hola."))).procesar(7, "Ana", "hola")
+    [e] = await eventos(sesiones, "respuesta_ia")
+    assert e.detalle["rondas"] == 1 and isinstance(e.detalle["ms"], int) and e.detalle["cortada"] is False
+
+
+async def test_alerta_al_operador_sin_repetirla(sesiones):
+    n = nucleo(sesiones, ModeloRoto())
+    alertas = []
+
+    async def alertar(texto):
+        alertas.append(texto)
+
+    n.alertar_operador = alertar
+    await n.procesar(7, "Ana", "hola")
+    await n.procesar(8, "Luis", "hola")
+    await n.esperar_tareas()
+    assert len(alertas) == 1 and "RuntimeError" in alertas[0]
+
+    n._ultima_alerta["fallo_ia"] -= 16 * 60  # pasados 15 minutos, vuelve a avisar
+    await n.procesar(9, "Eva", "hola")
+    await n.esperar_tareas()
+    assert len(alertas) == 2
+    primero = (await eventos(sesiones, "fallo_ia"))[0]
+    assert primero.detalle["error"] == "RuntimeError"
+
+
+async def test_si_la_alerta_falla_se_reintenta_en_el_siguiente_fallo(sesiones):
+    n = nucleo(sesiones, ModeloRoto())
+    intentos = []
+
+    async def alertar_roto(texto):
+        intentos.append(texto)
+        raise RuntimeError("Telegram caído")
+
+    n.alertar_operador = alertar_roto
+    await n.procesar(7, "Ana", "hola")
+    await n.esperar_tareas()
+    await n.procesar(8, "Luis", "hola")
+    await n.esperar_tareas()
+    assert len(intentos) == 2

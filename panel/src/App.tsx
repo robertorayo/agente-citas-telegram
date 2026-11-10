@@ -4,10 +4,11 @@ import { Auditoria } from './componentes/Auditoria'
 import { Chat } from './componentes/Chat'
 import { Citas } from './componentes/Citas'
 import { ListaConversaciones } from './componentes/ListaConversaciones'
+import { Metricas } from './componentes/Metricas'
 import { Tarjetas } from './componentes/Tarjetas'
 import { useSondeo } from './useSondeo'
 
-type Vista = 'conversaciones' | 'citas' | 'auditoria'
+type Vista = 'conversaciones' | 'citas' | 'metricas' | 'auditoria'
 
 export default function App() {
   const [conectado, setConectado] = useState(Boolean(token.leer()))
@@ -94,6 +95,7 @@ function Panel({ alSalir }: { alSalir: () => void }) {
   const pestanas: [Vista, string][] = [
     ['conversaciones', 'Conversaciones'],
     ['citas', 'Citas'],
+    ['metricas', 'Métricas'],
     ['auditoria', 'Auditoría'],
   ]
 
@@ -145,6 +147,7 @@ function Panel({ alSalir }: { alSalir: () => void }) {
         </section>
       )}
       {vista === 'citas' && <Citas />}
+      {vista === 'metricas' && <Metricas />}
       {vista === 'auditoria' && <Auditoria />}
     </div>
   )

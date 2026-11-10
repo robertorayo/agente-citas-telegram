@@ -77,7 +77,11 @@ def conectar(nucleo: Nucleo, bot: Bot) -> None:
         async def avisar(aviso: Aviso) -> None:
             await bot.send_message(operador, texto_aviso(aviso, f"{url}/panel/" if url else ""))
 
+        async def alertar(texto: str) -> None:
+            await bot.send_message(operador, texto)
+
         nucleo.avisar_operador = avisar
+        nucleo.alertar_operador = alertar
 
 
 def crear_dispatcher(nucleo: Nucleo) -> Dispatcher:

@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from . import metricas
 from .agenda import describir_cita
 from .config import Ajustes
 from .config import ajustes as leer_ajustes
@@ -108,6 +109,7 @@ def crear_app(
         yield
         if tareas:  # deja terminar las respuestas en curso antes de apagar
             await asyncio.wait(tareas, timeout=10)
+        await n.esperar_tareas()
         if sondeo:
             sondeo.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -272,10 +274,19 @@ def crear_app(
                 for c in filas
             ]
 
+    @app.get("/api/metricas", dependencies=[Protegido])
+    async def ver_metricas(n: NucleoDep, horas: int = 24):
+        async with n.sesiones() as s:
+            return await metricas.calcular(s, n.reloj(), min(max(horas, 1), 24 * 30))
+
     @app.get("/api/eventos", dependencies=[Protegido])
     async def eventos(n: NucleoDep, limite: int = 50):
         async with n.sesiones() as s:
-            filas = await s.scalars(select(Evento).order_by(Evento.id.desc()).limit(min(max(limite, 1), 200)))
+            # Las respuestas de la IA son muy frecuentes y ya se resumen en Métricas: aquí taparían lo importante.
+            filas = await s.scalars(
+                select(Evento).where(Evento.tipo != "respuesta_ia")
+                .order_by(Evento.id.desc()).limit(min(max(limite, 1), 200))
+            )
             return [{"id": e.id, "chat_id": e.chat_id, "tipo": e.tipo, "detalle": e.detalle, "fecha": e.fecha}
                     for e in filas]
 
