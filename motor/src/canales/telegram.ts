@@ -9,6 +9,9 @@ import type { Aviso, Nucleo } from '../nucleo.js'
 import type { Boton, Salida } from '../tipos.js'
 
 export const FIRMA_OPERADOR = '— Equipo de la clínica'
+export const TEXTO_COMO_DEVOLVER =
+  'Para devolver una conversación al asistente, responde a su aviso (mantén pulsado el aviso y elige «Responder») ' +
+  'con /devolver. También puedes hacerlo desde el panel.'
 const NOMBRE_CANAL = { telegram: 'Telegram', web: 'chat web' } as const
 
 // Marca que llevan los avisos al operador para saber a qué conversación responde.
@@ -98,6 +101,13 @@ export class CanalTelegram {
         }
       },
     )
+
+    // El operador escribe /devolver sin responder a ningún aviso: no se sabe qué conversación devolver, así que se
+    // le explica cómo hacerlo en vez de tratarlo como un mensaje más (que se quedaría sin respuesta).
+    privado.command('devolver', async (ctx, next) => {
+      if (!operador || ctx.chat.id !== operador) return next()
+      await ctx.reply(TEXTO_COMO_DEVOLVER)
+    })
 
     privado.command(['start', 'menu'], async (ctx) => {
       const r = await this.nucleo.procesar({ tipo: 'inicio', canal: 'telegram', chatId: ctx.chat.id, nombre: nombreDe(ctx) })
