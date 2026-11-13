@@ -19,7 +19,8 @@ RUN npm run build && npm prune --omit=dev
 
 # 3) Imagen final: FrankenPHP (PHP 8.4) con el binario de Node copiado de la imagen oficial.
 FROM dunglas/frankenphp:1-php8.4-bookworm
-RUN install-php-extensions pdo_pgsql intl opcache
+# zip: Composer la necesita para descomprimir los paquetes.
+RUN install-php-extensions pdo_pgsql intl opcache zip
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 
