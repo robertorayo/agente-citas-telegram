@@ -1,5 +1,6 @@
 import { api } from '../api'
 import { fechaLarga, hora } from '../formato'
+import { useCambios } from '../enVivo'
 import { useSondeo } from '../useSondeo'
 import { Avatar } from './Avatar'
 
@@ -11,7 +12,8 @@ const colores: Record<string, string> = {
 }
 
 export function Citas() {
-  const { datos } = useSondeo(api.citas, 8000)
+  const { datos, refrescar } = useSondeo(api.citas, 8000)
+  useCambios(() => refrescar())
   return (
     <section className="vidrio overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">

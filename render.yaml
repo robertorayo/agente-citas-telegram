@@ -1,4 +1,4 @@
-# Blueprint de Render: crea el servicio web gratuito a partir del Dockerfile.
+# Blueprint de Render: un servicio web gratuito a partir del Dockerfile (motor de Node + API de Laravel).
 # Los valores marcados con sync: false se rellenan a mano en el panel de Render (son secretos).
 services:
   - type: web
@@ -20,6 +20,11 @@ services:
       - key: PANEL_TOKEN
         generateValue: true
       - key: WEBHOOK_SECRETO
+        generateValue: true
+      # Secreto compartido entre el motor y la API, y semilla de la clave de Laravel.
+      - key: MOTOR_TOKEN
+        generateValue: true
+      - key: APP_SECRETO
         generateValue: true
       - key: LLM_MODELO
         value: openai/gpt-oss-120b

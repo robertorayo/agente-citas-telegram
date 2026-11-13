@@ -6,6 +6,7 @@ import { Citas } from './componentes/Citas'
 import { ListaConversaciones } from './componentes/ListaConversaciones'
 import { Metricas } from './componentes/Metricas'
 import { Tarjetas } from './componentes/Tarjetas'
+import { useCambios, useConexionEnVivo } from './enVivo'
 import { useSondeo } from './useSondeo'
 
 type Vista = 'conversaciones' | 'citas' | 'metricas' | 'auditoria'
@@ -151,6 +152,11 @@ function Panel({ alSalir }: { alSalir: () => void }) {
   const salud = useSondeo(api.salud, 15000)
   const resumen = useSondeo(api.resumen, 4000)
   const conversaciones = useSondeo(api.conversaciones, 4000)
+  const enVivo = useConexionEnVivo()
+  useCambios(() => {
+    conversaciones.refrescar()
+    resumen.refrescar()
+  })
 
   const sinPermiso = resumen.error instanceof ErrorApi && resumen.error.status === 401
   useEffect(() => {
@@ -162,6 +168,7 @@ function Panel({ alSalir }: { alSalir: () => void }) {
       <header className="vidrio flex animate-brotar flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
         <Marca />
         <div className="flex items-center gap-2 text-xs">
+          <Estado activo={enVivo} texto="En vivo" />
           <Estado activo={salud.datos?.telegram} texto="Telegram" />
           <Estado activo={salud.datos?.ia} texto="IA" />
           <button

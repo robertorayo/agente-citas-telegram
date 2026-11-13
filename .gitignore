@@ -1,14 +1,9 @@
-# Python
-backend/.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.ruff_cache/
-
 # Datos locales y secretos
 *.db
+*.sqlite
 .env
 
-# Panel
-panel/node_modules/
+# Dependencias y compilados
+**/node_modules/
 panel/dist/
+motor/dist/

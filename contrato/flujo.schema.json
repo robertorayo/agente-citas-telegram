@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/robertorayo/agente-citas-telegram/contrato/flujo.schema.json",
+  "title": "Flujo del asistente",
+  "description": "Textos, palabras clave de los guardarraíles y pasos de botones del asistente. Lo ejecuta el motor de flujos (motor/src/flujos). Los botones no guardan estado en el servidor: cada uno lleva el paso al que va y los datos elegidos hasta ese momento.",
+  "type": "object",
+  "required": ["version", "textos", "guardarrailes", "inicio", "pasos"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "textos": {
+      "description": "Mensajes fijos del asistente.",
+      "type": "object",
+      "required": [
+        "bienvenida", "traspaso", "yaTraspasada", "limite", "largo", "sinIa", "falloIa",
+        "urgencia", "consejoMedico", "botonNoValido", "soloTexto"
+      ],
+      "additionalProperties": { "$ref": "#/$defs/texto" }
+    },
+    "guardarrailes": {
+      "description": "Palabras o expresiones que activan cada regla. Se comparan en minúsculas y sin tildes.",
+      "type": "object",
+      "required": ["urgencia", "humano", "consejoMedico"],
+      "additionalProperties": false,
+      "properties": {
+        "urgencia": { "$ref": "#/$defs/claves" },
+        "humano": { "$ref": "#/$defs/claves" },
+        "consejoMedico": { "$ref": "#/$defs/claves" }
+      }
+    },
+    "inicio": { "description": "Paso que se muestra con el menú.", "$ref": "#/$defs/idPaso" },
+    "pasos": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/idPaso" },
+      "additionalProperties": { "$ref": "#/$defs/paso" }
+    }
+  },
+  "$defs": {
+    "texto": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "claves": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
+    "idPaso": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,23}$" },
+    "plantilla": {
+      "description": "Texto con variables entre llaves: {servicio}, {dia}, {hora}, {cita}, {citas}, {error} y, en las opciones, los campos de cada elemento.",
+      "$ref": "#/$defs/texto"
+    },
+    "boton": {
+      "type": "object",
+      "required": ["texto", "ir"],
+      "additionalProperties": false,
+      "properties": {
+        "texto": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "ir": { "$ref": "#/$defs/idPaso" }
+      }
+    },
+    "opciones": {
+      "description": "Un botón por cada elemento de una fuente de datos de la API.",
+      "type": "object",
+      "required": ["de", "texto", "ir", "guardar"],
+      "additionalProperties": false,
+      "properties": {
+        "de": { "enum": ["servicios", "dias_libres", "huecos", "mis_citas"] },
+        "texto": { "$ref": "#/$defs/plantilla" },
+        "ir": { "$ref": "#/$defs/idPaso" },
+        "guardar": {
+          "description": "Qué dato del elemento elegido se lleva el botón.",
+          "enum": ["servicio", "dia", "hora", "cita"]
+        }
+      }
+    },
+    "paso": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hacer": {
+          "description": "Operación que se ejecuta al entrar en el paso, antes de mostrar el texto.",
+          "enum": ["reservar", "cancelar", "pasar_a_humano"]
+        },
+        "texto": { "$ref": "#/$defs/plantilla" },
+        "siVacio": { "description": "Texto si la fuente de las opciones no devuelve nada.", "$ref": "#/$defs/plantilla" },
+        "siError": { "description": "Texto si la operación falla. {error} es el motivo que da la API.", "$ref": "#/$defs/plantilla" },
+        "opciones": { "$ref": "#/$defs/opciones" },
+        "botones": { "type": "array", "items": { "$ref": "#/$defs/boton" } },
+        "columnas": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "volver": { "description": "Añade un botón «« Menú» o «« Atrás» que lleva a este paso.", "$ref": "#/$defs/idPaso" },
+        "menu": { "description": "Muestra los botones del paso de inicio debajo del texto.", "type": "boolean" }
+      },
+      "required": ["texto"]
+    }
+  }
+}

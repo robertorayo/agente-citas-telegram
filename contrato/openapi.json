@@ -1,0 +1,377 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API de Clínica Alba (Laravel)",
+    "version": "2.0.0",
+    "description": "Agenda, conversaciones, auditoría y métricas del agente de citas. Los errores salen siempre como {\"error\": \"...\"}: 422 para reglas de la agenda y datos no válidos, 404 si no existe, 401 sin credenciales, 429 por límites de uso. La usan el motor de conversación (rutas /api/interna, con MOTOR_TOKEN), el panel de recepción (con X-Panel-Token) y el chat web y el panel en modo demo (con X-Web-Token). Todas las fechas van en ISO 8601 con zona horaria. Los nombres de los campos van en snake_case."
+  },
+  "servers": [{ "url": "/" }],
+  "tags": [
+    { "name": "interna", "description": "Solo para el motor de conversación (Node)." },
+    { "name": "panel", "description": "Panel de recepción completo." },
+    { "name": "demo", "description": "Panel en modo demo: solo la conversación del visitante." },
+    { "name": "web", "description": "Chat web: sesión e historial." }
+  ],
+  "components": {
+    "securitySchemes": {
+      "motor": { "type": "http", "scheme": "bearer", "description": "MOTOR_TOKEN, compartido entre el motor y la API." },
+      "panel": { "type": "apiKey", "in": "header", "name": "X-Panel-Token" },
+      "visitante": { "type": "apiKey", "in": "header", "name": "X-Web-Token" }
+    },
+    "parameters": {
+      "chatId": { "name": "chat_id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error con un mensaje que se puede mostrar al usuario.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Ok": {
+        "description": "Hecho.",
+        "content": { "application/json": { "schema": { "type": "object", "required": ["ok"], "properties": { "ok": { "const": true } } } } }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      },
+      "Canal": { "enum": ["telegram", "web"] },
+      "Modo": { "enum": ["bot", "humano"] },
+      "Autor": { "enum": ["usuario", "bot", "operador"] },
+      "Conversacion": {
+        "type": "object",
+        "required": ["chat_id", "nombre", "canal", "modo", "motivo", "actualizada"],
+        "properties": {
+          "chat_id": { "type": "integer", "format": "int64", "description": "Positivo en Telegram; negativo y aleatorio en la web." },
+          "nombre": { "type": "string", "maxLength": 120 },
+          "canal": { "$ref": "#/components/schemas/Canal" },
+          "modo": { "$ref": "#/components/schemas/Modo" },
+          "motivo": { "type": ["string", "null"], "description": "Motivo del traspaso a una persona." },
+          "actualizada": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ConversacionResumen": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Conversacion" },
+          { "type": "object", "required": ["ultimo"], "properties": { "ultimo": { "type": ["string", "null"], "maxLength": 120 } } }
+        ]
+      },
+      "Mensaje": {
+        "type": "object",
+        "required": ["id", "autor", "texto", "fecha"],
+        "properties": {
+          "id": { "type": "integer" },
+          "autor": { "$ref": "#/components/schemas/Autor" },
+          "texto": { "type": "string" },
+          "fecha": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Servicio": {
+        "type": "object",
+        "required": ["id", "nombre", "minutos"],
+        "properties": { "id": { "type": "integer" }, "nombre": { "type": "string" }, "minutos": { "type": "integer" } }
+      },
+      "Dia": {
+        "type": "object",
+        "required": ["fecha", "texto"],
+        "properties": {
+          "fecha": { "type": "string", "format": "date" },
+          "texto": { "type": "string", "examples": ["jueves 19 de noviembre"] }
+        }
+      },
+      "Cita": {
+        "type": "object",
+        "required": ["id", "chat_id", "nombre", "servicio", "inicio", "texto"],
+        "properties": {
+          "id": { "type": "integer" },
+          "chat_id": { "type": "integer", "format": "int64" },
+          "nombre": { "type": "string" },
+          "servicio": { "type": "string" },
+          "inicio": { "type": "string", "format": "date-time" },
+          "texto": { "type": "string", "examples": ["Fisioterapia, jueves 19 de noviembre a las 16:45"] }
+        }
+      },
+      "Texto": {
+        "type": "object",
+        "required": ["texto"],
+        "properties": { "texto": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+      },
+      "Evento": {
+        "type": "object",
+        "required": ["id", "chat_id", "tipo", "detalle", "fecha"],
+        "properties": {
+          "id": { "type": "integer" },
+          "chat_id": { "type": ["integer", "null"], "format": "int64" },
+          "tipo": { "type": "string", "maxLength": 40 },
+          "detalle": { "type": "object" },
+          "fecha": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Resumen": {
+        "type": "object",
+        "required": ["esperando_operador", "conversaciones", "citas_pendientes"],
+        "properties": {
+          "esperando_operador": { "type": "integer" },
+          "conversaciones": { "type": "integer" },
+          "citas_pendientes": { "type": "integer" }
+        }
+      },
+      "Metricas": {
+        "type": "object",
+        "description": "Recuentos y tiempos calculados a partir del registro de auditoría.",
+        "required": [
+          "horas", "conversaciones_activas", "por_canal", "conversaciones_nuevas", "mensajes_de_usuarios",
+          "citas_reservadas", "citas_canceladas", "traspasos", "mensajes_de_operador", "avisos", "ia", "eventos_truncados"
+        ],
+        "properties": {
+          "horas": { "type": "integer" },
+          "conversaciones_activas": { "type": "integer" },
+          "por_canal": { "type": "object", "additionalProperties": { "type": "integer" } },
+          "conversaciones_nuevas": { "type": "integer" },
+          "mensajes_de_usuarios": { "type": "integer" },
+          "citas_reservadas": { "type": "integer" },
+          "citas_canceladas": { "type": "integer" },
+          "traspasos": { "type": "integer" },
+          "mensajes_de_operador": { "type": "integer" },
+          "avisos": {
+            "type": "object",
+            "required": ["urgencias", "consejo_medico_rechazado", "limite_superado"],
+            "properties": {
+              "urgencias": { "type": "integer" },
+              "consejo_medico_rechazado": { "type": "integer" },
+              "limite_superado": { "type": "integer" }
+            }
+          },
+          "ia": {
+            "type": "object",
+            "required": ["respuestas", "fallos", "tasa_de_fallo", "ms_media", "ms_p50", "ms_p95", "cortadas", "herramientas"],
+            "properties": {
+              "respuestas": { "type": "integer" },
+              "fallos": { "type": "integer" },
+              "tasa_de_fallo": { "type": ["number", "null"] },
+              "ms_media": { "type": ["integer", "null"] },
+              "ms_p50": { "type": ["integer", "null"] },
+              "ms_p95": { "type": ["integer", "null"] },
+              "cortadas": { "type": "integer" },
+              "herramientas": { "type": "object", "additionalProperties": { "type": "integer" } }
+            }
+          },
+          "eventos_truncados": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/interna/conversaciones/{chat_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "put": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Obtiene la conversación, o la crea si no existe (registra conversacion_nueva).",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["nombre", "canal"],
+          "properties": { "nombre": { "type": "string", "maxLength": 120 }, "canal": { "$ref": "#/components/schemas/Canal" } }
+        } } } },
+        "responses": { "200": { "description": "Conversación", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversacion" } } } } }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/mensajes": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Los últimos mensajes, en orden cronológico (contexto de la IA).",
+        "parameters": [{ "name": "ultimos", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 12 } }],
+        "responses": { "200": { "description": "Mensajes", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Mensaje" } } } } } }
+      },
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Guarda un mensaje del usuario o del asistente.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["autor", "texto"],
+          "properties": { "autor": { "enum": ["usuario", "bot"] }, "texto": { "type": "string", "minLength": 1, "maxLength": 4000 } }
+        } } } },
+        "responses": { "201": { "description": "Mensaje guardado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mensaje" } } } } }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/traspaso": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Pasa la conversación a una persona. Devuelve si ya lo estaba y el último mensaje del usuario, para el aviso.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["motivo"], "properties": { "motivo": { "type": "string", "maxLength": 300 } }
+        } } } },
+        "responses": { "200": { "description": "Traspasada", "content": { "application/json": { "schema": {
+          "type": "object", "required": ["conversacion", "ya_estaba", "ultimo_mensaje"],
+          "properties": {
+            "conversacion": { "$ref": "#/components/schemas/Conversacion" },
+            "ya_estaba": { "type": "boolean" },
+            "ultimo_mensaje": { "type": ["string", "null"] }
+          }
+        } } } } }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/operador": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Mensaje de un operador que ha respondido al aviso desde Telegram. Sigue el mismo camino que el del panel.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Texto" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" }, "502": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/devolver": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Devuelve la conversación al asistente (el operador respondió /devolver al aviso).",
+        "responses": { "200": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/interna/eventos": {
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Añade un evento al registro de auditoría (respuesta_ia, herramienta, urgencia_detectada...).",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["tipo"],
+          "properties": {
+            "chat_id": { "type": ["integer", "null"], "format": "int64" },
+            "tipo": { "type": "string", "pattern": "^[a-z_]{3,40}$" },
+            "detalle": { "type": "object" }
+          }
+        } } } },
+        "responses": { "201": { "$ref": "#/components/responses/Ok" } }
+      }
+    },
+    "/api/interna/servicios": {
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "responses": { "200": { "description": "Servicios", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Servicio" } } } } } }
+      }
+    },
+    "/api/interna/servicios/{servicio_id}/dias-libres": {
+      "parameters": [{ "name": "servicio_id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Próximos días laborables con al menos un hueco.",
+        "parameters": [{ "name": "cuantos", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 10, "default": 6 } }],
+        "responses": {
+          "200": { "description": "Días", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Dia" } } } } },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/interna/servicios/{servicio_id}/huecos": {
+      "parameters": [{ "name": "servicio_id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "parameters": [{ "name": "fecha", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }],
+        "responses": {
+          "200": { "description": "Horas libres (HH:MM, hora de Madrid)", "content": { "application/json": { "schema": {
+            "type": "object", "required": ["dia", "horas"],
+            "properties": { "dia": { "$ref": "#/components/schemas/Dia" }, "horas": { "type": "array", "items": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" } } }
+          } } } },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/citas": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Citas pendientes del paciente.",
+        "responses": { "200": { "description": "Citas", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Cita" } } } } } }
+      },
+      "post": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Reserva una cita si el hueco sigue libre y el paciente no supera sus límites.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["servicio_id", "fecha", "hora"],
+          "properties": {
+            "servicio_id": { "type": "integer" },
+            "fecha": { "type": "string", "format": "date" },
+            "hora": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" }
+          }
+        } } } },
+        "responses": {
+          "201": { "description": "Reservada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cita" } } } },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/interna/conversaciones/{chat_id}/citas/{cita_id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/chatId" },
+        { "name": "cita_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+      ],
+      "delete": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Cancela una cita futura del propio paciente. Responde igual si no existe o es de otro.",
+        "responses": {
+          "200": { "description": "Cancelada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cita" } } } },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/interna/sesiones-web/{token}": {
+      "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string", "minLength": 20, "maxLength": 64 } }],
+      "get": {
+        "tags": ["interna"], "security": [{ "motor": [] }],
+        "summary": "Conversación web del visitante (para autenticar su websocket).",
+        "responses": {
+          "200": { "description": "Conversación", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversacion" } } } },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+
+    "/api/resumen": { "get": { "tags": ["panel"], "security": [{ "panel": [] }], "responses": { "200": { "description": "Resumen", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Resumen" } } } } } } },
+    "/api/conversaciones": { "get": { "tags": ["panel"], "security": [{ "panel": [] }], "summary": "Las 100 más recientes.", "responses": { "200": { "description": "Conversaciones", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ConversacionResumen" } } } } } } } },
+    "/api/conversaciones/{chat_id}/mensajes": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "get": { "tags": ["panel"], "security": [{ "panel": [] }], "summary": "Los 300 mensajes más recientes, en orden cronológico.", "responses": { "200": { "description": "Mensajes", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Mensaje" } } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "post": {
+        "tags": ["panel"], "security": [{ "panel": [] }],
+        "summary": "Responde como operador. El motor lo entrega por el canal del paciente; solo se guarda si se entrega.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Texto" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" }, "502": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/conversaciones/{chat_id}/devolver": { "parameters": [{ "$ref": "#/components/parameters/chatId" }], "post": { "tags": ["panel"], "security": [{ "panel": [] }], "responses": { "200": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" } } } },
+    "/api/citas": { "get": { "tags": ["panel"], "security": [{ "panel": [] }], "summary": "Próximas citas confirmadas.", "responses": { "200": { "description": "Citas", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Cita" } } } } } } } },
+    "/api/metricas": { "get": { "tags": ["panel"], "security": [{ "panel": [] }], "parameters": [{ "name": "horas", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 720, "default": 24 } }], "responses": { "200": { "description": "Métricas", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Metricas" } } } } } } },
+    "/api/eventos": { "get": { "tags": ["panel"], "security": [{ "panel": [] }], "summary": "Registro de auditoría, sin respuesta_ia.", "parameters": [{ "name": "limite", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 } }], "responses": { "200": { "description": "Eventos", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Evento" } } } } } } } },
+
+    "/api/demo/resumen": { "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "responses": { "200": { "description": "Resumen de la conversación del visitante", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Resumen" } } } } } } },
+    "/api/demo/conversaciones": { "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "responses": { "200": { "description": "Solo la conversación del visitante", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ConversacionResumen" } } } } } } } },
+    "/api/demo/conversaciones/{chat_id}/mensajes": {
+      "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+      "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "responses": { "200": { "description": "Mensajes", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Mensaje" } } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["demo"], "security": [{ "visitante": [] }], "summary": "El visitante responde como operador a su propia conversación (20 cada 10 min).", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Texto" } } } }, "responses": { "201": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/demo/conversaciones/{chat_id}/devolver": { "parameters": [{ "$ref": "#/components/parameters/chatId" }], "post": { "tags": ["demo"], "security": [{ "visitante": [] }], "summary": "3 cada 10 min por visitante y 20 en total.", "responses": { "200": { "$ref": "#/components/responses/Ok" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } } },
+    "/api/demo/citas": { "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "responses": { "200": { "description": "Citas del visitante", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Cita" } } } } } } } },
+    "/api/demo/metricas": { "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "summary": "Globales (solo recuentos), en 24 h, 7 o 30 días, con caché de 30 s.", "parameters": [{ "name": "horas", "in": "query", "schema": { "type": "integer" } }], "responses": { "200": { "description": "Métricas", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Metricas" } } } } } } },
+    "/api/demo/eventos": { "get": { "tags": ["demo"], "security": [{ "visitante": [] }], "responses": { "200": { "description": "Eventos del visitante", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Evento" } } } } } } } },
+
+    "/api/web/sesion": {
+      "post": {
+        "tags": ["web"],
+        "summary": "Crea una conversación web anónima. 10 por IP y 100 en total cada 10 min.",
+        "responses": {
+          "201": { "description": "Sesión", "content": { "application/json": { "schema": { "type": "object", "required": ["token"], "properties": { "token": { "type": "string" } } } } } },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/web/mensajes": {
+      "get": {
+        "tags": ["web"], "security": [{ "visitante": [] }],
+        "summary": "Historial del visitante a partir de un id (al reconectar el websocket).",
+        "parameters": [{ "name": "desde", "in": "query", "schema": { "type": "integer", "default": 0 } }],
+        "responses": { "200": { "description": "Mensajes", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Mensaje" } } } } }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type Conversacion, type Mensaje } from '../api'
 import { hora } from '../formato'
+import { useCambios } from '../enVivo'
 import { useSondeo } from '../useSondeo'
 import { Avatar } from './Avatar'
 
@@ -38,6 +39,7 @@ export function Chat({ conversacion, alCambiar }: Props) {
 function ChatAbierto({ conversacion, alCambiar }: { conversacion: Conversacion; alCambiar: () => void }) {
   const { chat_id: chatId } = conversacion
   const mensajes = useSondeo(() => api.mensajes(chatId), 3000)
+  useCambios(() => mensajes.refrescar(), chatId)
   const [texto, setTexto] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)

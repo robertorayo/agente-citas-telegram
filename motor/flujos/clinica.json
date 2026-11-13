@@ -1,0 +1,102 @@
+{
+  "$schema": "../../contrato/flujo.schema.json",
+  "version": 1,
+  "textos": {
+    "bienvenida": "Hola, soy el asistente de citas de Clínica Alba (centro ficticio de demostración).\n\nPuedes usar los botones o escribirme, por ejemplo: «¿Tenéis hueco para fisioterapia el jueves por la tarde?»",
+    "traspaso": "Te paso con una persona del centro. Te escribirá por aquí en cuanto pueda.",
+    "yaTraspasada": "Ya he avisado al equipo. Te escribirán por aquí en cuanto puedan.",
+    "limite": "Has enviado muchos mensajes seguidos. Espera unos minutos y vuelve a escribirme, por favor.",
+    "largo": "El mensaje es demasiado largo. ¿Puedes resumirlo en unas líneas?",
+    "sinIa": "Puedo ayudarte con tus citas desde el menú. Si prefieres, escribe «hablar con una persona».",
+    "falloIa": "Ahora mismo no puedo procesar mensajes escritos. Usa el menú, o escribe «hablar con una persona».",
+    "urgencia": "Si es una urgencia médica, llama ahora al 112. Este asistente solo gestiona citas y no puede atender urgencias.",
+    "consejoMedico": "No puedo dar consejos médicos ni valorar síntomas. Puedo darte cita con un profesional, o pasarte con una persona del centro si lo prefieres.",
+    "botonNoValido": "No he podido hacer eso. Vuelve al menú, por favor.",
+    "soloTexto": "Por ahora solo entiendo mensajes de texto."
+  },
+  "guardarrailes": {
+    "urgencia": [
+      "urgencia", "emergencia", "infarto", "no puedo respirar", "me ahogo", "dolor en el pecho",
+      "desmayo", "inconsciente", "sangra mucho", "hemorragia", "suicid", "quitarme la vida"
+    ],
+    "humano": [
+      "hablar con una persona", "hablar con alguien", "persona real", "con un humano", "operador",
+      "agente humano", "hablar con recepcion"
+    ],
+    "consejoMedico": [
+      "que me tomo", "que tomo", "que pastilla", "que medicamento", "dosis", "es grave",
+      "diagnostico", "es normal que me duela"
+    ]
+  },
+  "inicio": "menu",
+  "pasos": {
+    "menu": {
+      "texto": "¿Qué quieres hacer?",
+      "botones": [
+        { "texto": "Pedir cita", "ir": "servicios" },
+        { "texto": "Mis citas", "ir": "mis_citas" },
+        { "texto": "Hablar con una persona", "ir": "humano" }
+      ],
+      "columnas": 2
+    },
+    "servicios": {
+      "texto": "¿Para qué servicio?",
+      "opciones": { "de": "servicios", "texto": "{nombre} ({minutos} min)", "ir": "dias", "guardar": "servicio" },
+      "columnas": 1,
+      "volver": "menu"
+    },
+    "dias": {
+      "texto": "{servicio}: elige el día.",
+      "siVacio": "No quedan huecos de {servicio} en los próximos días.",
+      "opciones": { "de": "dias_libres", "texto": "{texto}", "ir": "horas", "guardar": "dia" },
+      "columnas": 2,
+      "volver": "servicios"
+    },
+    "horas": {
+      "texto": "Horas libres el {dia}:",
+      "siVacio": "El {dia} ya no quedan huecos.",
+      "opciones": { "de": "huecos", "texto": "{hora}", "ir": "confirmar", "guardar": "hora" },
+      "columnas": 4,
+      "volver": "dias"
+    },
+    "confirmar": {
+      "texto": "¿Confirmo la cita de {servicio} el {dia} a las {hora}?",
+      "botones": [
+        { "texto": "Confirmar", "ir": "reservar" },
+        { "texto": "Cambiar", "ir": "horas" }
+      ],
+      "columnas": 2
+    },
+    "reservar": {
+      "hacer": "reservar",
+      "texto": "Cita confirmada: {cita}.",
+      "siError": "{error}",
+      "menu": true
+    },
+    "mis_citas": {
+      "texto": "Tus citas pendientes:\n{citas}",
+      "siVacio": "No tienes citas pendientes.",
+      "opciones": { "de": "mis_citas", "texto": "Cancelar: {cita}", "ir": "anular", "guardar": "cita" },
+      "columnas": 1,
+      "volver": "menu"
+    },
+    "anular": {
+      "texto": "¿Seguro que quieres cancelar la cita de {cita}?",
+      "botones": [
+        { "texto": "Sí, cancelar", "ir": "cancelar" },
+        { "texto": "No", "ir": "mis_citas" }
+      ],
+      "columnas": 2
+    },
+    "cancelar": {
+      "hacer": "cancelar",
+      "texto": "Cita cancelada.",
+      "siError": "{error}",
+      "menu": true
+    },
+    "humano": {
+      "hacer": "pasar_a_humano",
+      "texto": "Te paso con una persona del centro. Te escribirá por aquí en cuanto pueda."
+    }
+  }
+}

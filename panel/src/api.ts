@@ -67,8 +67,14 @@ export interface Metricas {
 
 export interface Salud {
   ok: boolean
+  api: boolean
   ia: boolean
   telegram: boolean
+}
+
+/** Con qué se identifica el panel en el websocket de avisos en vivo (contrato/ws.schema.json, «panelCliente»). */
+export function credencialPanel(): { panel_token: string } | { web_token: string } {
+  return demo.activo() ? { web_token: leerDe(localStorage, CLAVE_CHAT) } : { panel_token: token.leer() }
 }
 
 const CLAVE = 'panel-token'

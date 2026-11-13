@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/robertorayo/agente-citas-telegram/contrato/ws.schema.json",
+  "title": "Mensajes del websocket y de la entrega",
+  "description": "Mensajes JSON entre el motor (Node) y sus clientes: el chat web (/ws/chat), el panel (/ws/panel) y la API de Laravel (POST /interno/entregar). Cada mensaje lleva un campo «tipo».",
+  "$defs": {
+    "boton": {
+      "type": "object",
+      "required": ["texto", "accion"],
+      "additionalProperties": false,
+      "properties": {
+        "texto": { "type": "string", "maxLength": 60 },
+        "accion": { "type": "string", "maxLength": 64, "description": "Paso del flujo y datos elegidos, codificados por el motor. El cliente lo devuelve tal cual." }
+      }
+    },
+    "botones": {
+      "description": "Filas de botones.",
+      "type": "array",
+      "items": { "type": "array", "items": { "$ref": "#/$defs/boton" }, "maxItems": 4 }
+    },
+    "mensaje": {
+      "type": "object",
+      "required": ["id", "autor", "texto", "fecha"],
+      "properties": {
+        "id": { "type": "integer" },
+        "autor": { "enum": ["usuario", "bot", "operador"] },
+        "texto": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "chatCliente": {
+      "description": "Del navegador del visitante al motor, por /ws/chat.",
+      "oneOf": [
+        {
+          "type": "object", "required": ["tipo", "token"], "additionalProperties": false,
+          "properties": {
+            "tipo": { "const": "hola" },
+            "token": { "type": "string", "maxLength": 64 },
+            "desde": { "type": "integer", "minimum": 0, "description": "Último mensaje que ya tiene: el motor envía los posteriores." }
+          }
+        },
+        {
+          "type": "object", "required": ["tipo", "texto"], "additionalProperties": false,
+          "properties": { "tipo": { "const": "texto" }, "texto": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+        },
+        {
+          "type": "object", "required": ["tipo", "accion"], "additionalProperties": false,
+          "properties": {
+            "tipo": { "const": "accion" },
+            "accion": { "type": "string", "maxLength": 64 },
+            "etiqueta": { "type": "string", "maxLength": 60, "description": "Texto del botón pulsado, para el historial." }
+          }
+        }
+      ]
+    },
+    "chatServidor": {
+      "description": "Del motor al navegador del visitante.",
+      "oneOf": [
+        {
+          "type": "object", "required": ["tipo", "mensajes"],
+          "properties": {
+            "tipo": { "const": "mensajes" },
+            "mensajes": { "type": "array", "items": { "$ref": "#/$defs/mensaje" } },
+            "botones": { "$ref": "#/$defs/botones" }
+          }
+        },
+        { "type": "object", "required": ["tipo"], "properties": { "tipo": { "const": "escribiendo" } } },
+        {
+          "type": "object", "required": ["tipo", "mensaje"],
+          "properties": { "tipo": { "const": "error" }, "mensaje": { "type": "string" }, "sesion": { "type": "boolean", "description": "true si el token ya no vale y hay que pedir otra sesión." } }
+        }
+      ]
+    },
+
+    "panelCliente": {
+      "description": "Del panel al motor, por /ws/panel. Con la clave del panel recibe todos los cambios; con el token del chat (modo demo), solo los de su conversación.",
+      "type": "object", "required": ["tipo"], "additionalProperties": false,
+      "properties": {
+        "tipo": { "const": "hola" },
+        "panel_token": { "type": "string" },
+        "web_token": { "type": "string" }
+      }
+    },
+    "panelServidor": {
+      "description": "Del motor al panel: algo ha cambiado en una conversación y conviene refrescar.",
+      "type": "object", "required": ["tipo", "chat_id"],
+      "properties": { "tipo": { "const": "cambio" }, "chat_id": { "type": "integer" } }
+    },
+
+    "entrega": {
+      "description": "POST /interno/entregar, de la API al motor, con Authorization: Bearer <MOTOR_TOKEN>. Responde 200 si se ha entregado; 502 si el canal la rechaza; 503 si el canal no está conectado.",
+      "oneOf": [
+        {
+          "description": "Mensaje de un operador. En Telegram se envía antes de guardarlo; en la web ya está guardado y viene con su id.",
+          "type": "object", "required": ["tipo", "chat_id", "canal", "texto"], "additionalProperties": false,
+          "properties": {
+            "tipo": { "const": "operador" },
+            "chat_id": { "type": "integer" },
+            "canal": { "enum": ["telegram", "web"] },
+            "texto": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "mensaje": { "$ref": "#/$defs/mensaje" }
+          }
+        },
+        {
+          "description": "La conversación vuelve al asistente. La API ya ha guardado el aviso; el motor solo lo entrega, con el menú.",
+          "type": "object", "required": ["tipo", "chat_id", "canal", "mensaje"], "additionalProperties": false,
+          "properties": { "tipo": { "const": "devuelta" }, "chat_id": { "type": "integer" }, "canal": { "enum": ["telegram", "web"] }, "mensaje": { "$ref": "#/$defs/mensaje" } }
+        },
+        {
+          "description": "Algo ha cambiado: el motor avisa a los paneles conectados.",
+          "type": "object", "required": ["tipo", "chat_id"], "additionalProperties": false,
+          "properties": { "tipo": { "const": "cambio" }, "chat_id": { "type": "integer" } }
+        }
+      ]
+    }
+  }
+}
