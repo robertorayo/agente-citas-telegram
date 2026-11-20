@@ -63,6 +63,20 @@ async function leerCuerpo(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(trozos).toString() || '{}')
 }
 
+/** Todo lo que empiece por «/api/interna», sin distinguir mayúsculas y aunque lleve barras de más. */
+const ES_API_INTERNA = /^\/+api\/+interna/i
+/** Un segmento «..» que solo aparece al decodificar («..%2f»): desde fuera no hace falta y no se deja pasar. */
+const SALE_DE_LA_RUTA = /(^|[/\\])\.\.([/\\]|$)/
+
+/** La ruta con los %XX decodificados, como la ve Laravel; null si la codificación está rota. */
+export function decodificarRuta(ruta: string): string | null {
+  try {
+    return decodeURIComponent(ruta)
+  } catch {
+    return null
+  }
+}
+
 /** IP real del visitante: detrás del proxy del hosting es la última de X-Forwarded-For (las anteriores las puede escribir el cliente). */
 export function ipCliente(req: IncomingMessage): string {
   const reenviada = req.headers['x-forwarded-for']
@@ -165,8 +179,11 @@ export function crearServidor(p: Piezas): http.Server {
     const ruta = url.pathname
     try {
       if (ruta === '/api/salud') return await salud(res)
-      // La API interna es solo para el motor: desde fuera no se llega ni con el token.
-      if (ruta.startsWith('/api/interna')) return json(res, 404, { error: 'No encontrado' })
+      const decodificada = decodificarRuta(ruta)
+      if (decodificada === null || SALE_DE_LA_RUTA.test(decodificada)) return json(res, 400, { error: 'Ruta no válida' })
+      // La API interna es solo para el motor: desde fuera no se llega ni con el token. Se mira la ruta como la verá
+      // Laravel, que decodifica los %XX antes de buscarla: si no, «/api/%69nterna» pasaría el filtro.
+      if (ES_API_INTERNA.test(decodificada)) return json(res, 404, { error: 'No encontrado' })
       if (ruta.startsWith('/api/')) return reenviar(req, res, config.apiUrl, url)
       if (req.method === 'POST' && ruta === '/interno/entregar') return await entregar(req, res)
       if (req.method === 'POST' && ruta === RUTA_WEBHOOK && telegram && config.urlPublica) return await webhook(req, res)

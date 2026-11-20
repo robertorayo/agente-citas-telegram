@@ -162,4 +162,41 @@ describe('ataques al servidor', () => {
     assert.equal(r.status, 404)
     assert.equal(recibidas.length, 0)
   })
+
+  it('la API interna tampoco se reenvía disfrazada con codificación, mayúsculas o barras de más', async () => {
+    const http = await import('node:http')
+    recibidas.length = 0
+    // Laravel decodifica la ruta antes de buscarla: «%69nterna» acabaría en la ruta interna.
+    const rutas = ['/api/%69nterna/servicios', '/api/%49NTERNA/servicios', '/api/Interna/servicios', '/api//interna/servicios',
+      '/api/%2Finterna/servicios', '/api/./interna/servicios', '/api/x/%2e%2e/interna/servicios', '/api/interna', '/api/internas']
+    for (const ruta of rutas) {
+      const status = await new Promise<number>((ok, mal) => {
+        const req = http.request({ host: '127.0.0.1', port: Number(base.split(':')[1]), path: ruta }, (res) => {
+          res.resume()
+          res.on('end', () => ok(res.statusCode ?? 0))
+        })
+        req.on('error', mal)
+        req.end()
+      })
+      assert.equal(status, 404, ruta)
+    }
+    assert.equal(recibidas.length, 0)
+  })
+
+  it('una ruta con codificación rota o con «..» escondido se rechaza sin reenviarla', async () => {
+    recibidas.length = 0
+    for (const ruta of ['/api/%E0%A4%A', '/api/x/..%2finterna/servicios']) {
+      assert.equal((await fetch(`http://${base}${ruta}`)).status, 400, ruta)
+    }
+    assert.equal(recibidas.length, 0)
+  })
+
+  it('las rutas legítimas con codificación válida se siguen reenviando', async () => {
+    recibidas.length = 0
+    // Con doble codificación Laravel decodifica una sola vez y busca «%69nterna» literal, que no existe.
+    for (const ruta of ['/api/web/mensajes%20x', '/api/%2569nterna']) {
+      assert.equal((await fetch(`http://${base}${ruta}`)).status, 200, ruta)
+    }
+    assert.equal(recibidas.length, 2)
+  })
 })
