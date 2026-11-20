@@ -69,9 +69,12 @@ jobs:
           tools: composer:v2
       - run: composer install --no-interaction --no-progress --prefer-dist
       - run: composer audit
-      # Sin .env en CI: clave de aplicación de usar y tirar para esta ejecución.
-      - name: Generar APP_KEY temporal
-        run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      # En CI no hay .env: se crea vacío para que Laravel no avise en cada test de que no puede leerlo,
+      # y la clave de aplicación es de usar y tirar para esta ejecución.
+      - name: Preparar entorno de Laravel
+        run: |
+          touch .env
+          echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
       - name: Tests con SQLite (phpunit.xml)
         run: php vendor/bin/pest
       # phpunit.xml no sobrescribe variables que ya existen en el entorno,
