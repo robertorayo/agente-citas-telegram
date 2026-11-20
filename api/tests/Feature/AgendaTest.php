@@ -4,7 +4,9 @@ use App\Dominio\Agenda;
 use App\Dominio\ErrorAgenda;
 use App\Dominio\Fechas;
 use App\Models\Cita;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->travelTo(ahora());
@@ -82,6 +84,30 @@ it('escribe las fechas en español', function () {
     expect(Fechas::legible(hora(9)))->toBe('lunes 16 de noviembre')
         ->and(Fechas::legible(hora(9, 0, '2026-11-18')))->toBe('miércoles 18 de noviembre');
 });
+
+it('las reservas del mismo paciente se hacen de una en una aunque sean de servicios distintos (PostgreSQL)', function () {
+    // Otra conexión deja a medias una reserva del paciente 1, como si llegara a la vez por otro canal o pestaña.
+    config(['database.connections.pgsql_paralela' => config('database.connections.pgsql')]);
+    $principal = DB::getDefaultConnection();
+    $paralela = DB::connection('pgsql_paralela');
+    $paralela->beginTransaction();
+    try {
+        DB::setDefaultConnection('pgsql_paralela');
+        $this->agenda->reservar(1, 'Ana', MEDICINA, '2026-11-16', '09:00', ahora());
+        DB::setDefaultConnection($principal);
+
+        // La segunda, de otro servicio, no ve la primera (no está confirmada): sin el bloqueo por paciente pasaría.
+        // Con él espera a que termine la primera; aquí se corta la espera para que el test no se quede colgado.
+        DB::statement("set local lock_timeout = '500ms'");
+        // Se mira el código SQLSTATE (55P03, tiempo de espera de un bloqueo) y no el texto, que puede ir traducido.
+        expect(fn () => $this->agenda->reservar(1, 'Ana', FISIO, '2026-11-16', '09:00', ahora()))
+            ->toThrow(fn (QueryException $e) => expect($e->getCode())->toBe('55P03'));
+    } finally {
+        DB::setDefaultConnection($principal);
+        $paralela->rollBack();
+        DB::purge('pgsql_paralela');
+    }
+})->skip(fn () => DB::getDriverName() !== 'pgsql', 'Solo en PostgreSQL: en SQLite las escrituras ya van de una en una');
 
 it('protege el hueco con el índice único aunque falle la comprobación', function () {
     $this->agenda->reservar(1, 'Ana', MEDICINA, '2026-11-16', '09:00', ahora());

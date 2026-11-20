@@ -1,0 +1,110 @@
+# Tests del motor, la API y el panel en cada push y PR a develop y main.
+# Las actions van fijadas a SHA (con la versión en el comentario) para que una
+# etiqueta movida no cambie el código que se ejecuta.
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  motor:
+    name: Motor (Node)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: motor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: motor/package-lock.json
+      - run: npm ci
+      - run: npm run check
+
+  api:
+    name: API (PHP)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api
+    services:
+      postgres:
+        image: postgres:18.7-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
+        env:
+          POSTGRES_USER: citas
+          POSTGRES_PASSWORD: citas
+          POSTGRES_DB: citas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U citas -d citas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pdo_sqlite, zip
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: composer audit
+      # En CI no hay .env: se crea vacío para que Laravel no avise en cada test de que no puede leerlo,
+      # y la clave de aplicación es de usar y tirar para esta ejecución.
+      - name: Preparar entorno de Laravel
+        run: |
+          touch .env
+          echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - name: Tests con SQLite (phpunit.xml)
+        run: php vendor/bin/pest
+      # phpunit.xml no sobrescribe variables que ya existen en el entorno,
+      # así que estas mandan sobre su DB_CONNECTION=sqlite.
+      - name: Tests con PostgreSQL
+        run: php vendor/bin/pest
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_DATABASE: citas_test
+          DB_USERNAME: citas
+          DB_PASSWORD: citas
+          DB_SSLMODE: disable
+
+  panel:
+    name: Panel (React)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: panel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: panel/package-lock.json
+      - run: npm ci
+      - run: npm run check
