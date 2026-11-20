@@ -129,7 +129,11 @@ final class Agenda
 
         try {
             return DB::transaction(function () use ($chatId, $nombre, $servicioId, $inicio, $ahora) {
-                // En PostgreSQL bloquea el servicio: las reservas de un mismo servicio se hacen de una en una.
+                // En PostgreSQL bloquea al paciente: sus reservas se hacen de una en una aunque sean de servicios
+                // distintos, para que dos a la vez no se salten el límite de citas ni se solapen. Se bloquea antes
+                // que el servicio, siempre en el mismo orden, para no provocar interbloqueos.
+                $this->bloquearPaciente($chatId);
+                // Y bloquea el servicio: las reservas de un mismo servicio se hacen de una en una.
                 $servicio = Servicio::lockForUpdate()->find($servicioId) ?? throw new ErrorAgenda('Ese servicio no existe.');
                 $libre = collect($this->huecosLibres($servicioId, $inicio, $ahora))->contains(fn ($h) => $h->equalTo($inicio));
                 if (! $libre) {
@@ -162,6 +166,18 @@ final class Agenda
         } catch (UniqueConstraintViolationException) {
             // Otra persona ha reservado el mismo hueco a la vez: el índice único lo ha impedido.
             throw new ErrorAgenda('Esa hora ya no está disponible. Elige otra, por favor.');
+        }
+    }
+
+    /**
+     * Bloqueo de PostgreSQL por paciente hasta el final de la transacción. Es un bloqueo consultivo y no de fila
+     * porque el paciente puede no tener todavía fila en `conversaciones`. SQLite ya hace las escrituras de una en una.
+     */
+    private function bloquearPaciente(int $chatId): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            // Clave con prefijo propio para no coincidir con bloqueos consultivos de otras herramientas de la base.
+            DB::select("select pg_advisory_xact_lock(hashtextextended('reserva:' || ?, 0))", [(string) $chatId]);
         }
     }
 
