@@ -1,28 +1,105 @@
-# Agente de citas para Telegram y web
+<p align="center">
+  <img src="docs/img/banner.svg" alt="Agente de citas para Telegram y web" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/robertorayo/agente-citas-telegram/actions/workflows/ci.yml"><img src="https://github.com/robertorayo/agente-citas-telegram/actions/workflows/ci.yml/badge.svg?branch=develop" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Node.js_22-1a1433?style=flat-square&logo=nodedotjs&logoColor=10c98f" alt="Node.js 22">
+  <img src="https://img.shields.io/badge/TypeScript-1a1433?style=flat-square&logo=typescript&logoColor=00c2d1" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Laravel_13-1a1433?style=flat-square&logo=laravel&logoColor=ff6b5b" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/React_19-1a1433?style=flat-square&logo=react&logoColor=00c2d1" alt="React 19">
+  <img src="https://img.shields.io/badge/PostgreSQL-1a1433?style=flat-square&logo=postgresql&logoColor=c4b0ff" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Docker-1a1433?style=flat-square&logo=docker&logoColor=00c2d1" alt="Docker">
+  <img src="https://img.shields.io/badge/OpenAPI_3.1-1a1433?style=flat-square&logo=openapiinitiative&logoColor=10c98f" alt="OpenAPI 3.1">
+</p>
+
+<p align="center">
+  <a href="https://agente-citas-telegram.onrender.com"><img src="https://img.shields.io/badge/Probar_el_chat-web-ff3d8b?style=for-the-badge&labelColor=1a1433" alt="Probar el chat web"></a>
+  <a href="https://agente-citas-telegram.onrender.com/panel/?demo"><img src="https://img.shields.io/badge/Panel-modo_demo-7c4dff?style=for-the-badge&labelColor=1a1433" alt="Panel en modo demo"></a>
+  <a href="https://t.me/turnos_demobot"><img src="https://img.shields.io/badge/Telegram-@turnos__demobot-00c2d1?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1a1433" alt="Bot de Telegram"></a>
+</p>
 
 Asistente de citas para un centro médico ficticio (Clínica Alba). Los pacientes piden, consultan y cancelan citas por **Telegram** o desde el **chat de la web**, con botones o escribiendo con normalidad. Si hace falta, la conversación pasa a una persona, que recibe un aviso en Telegram y responde desde el panel de recepción o desde el propio Telegram.
 
 El proyecto son dos servicios unidos por contratos JSON: un **motor de conversación en Node.js y TypeScript** (canales, flujos, IA) y una **API en PHP con Laravel** (agenda, conversaciones, auditoría). La primera versión, con todo en Python, está en la etiqueta `v1-python`.
 
+> [!NOTE]
+> El servicio está en el plan gratuito de Render: si lleva un rato sin visitas, la primera carga tarda alrededor de un minuto en despertar.
+
+<p align="center">
+  <img src="docs/img/panel.jpg" alt="Panel de recepción en modo demo: conversaciones en espera, chat con un paciente y botón para devolverlo al asistente" width="90%">
+  <br><sub>Panel de recepción en modo demo</sub>
+</p>
+
 ## Qué hace
 
-- **Dos canales, un solo asistente:** Telegram y el chat de la web usan el mismo núcleo, los mismos flujos y la misma agenda. Las conversaciones de los dos canales llegan al mismo panel.
-- **Citas con botones, definidas en JSON:** pedir cita (servicio → día → hora → confirmar), ver las citas pendientes y cancelarlas. Los pasos, los textos y las palabras clave de los guardarraíles están en [`motor/flujos/clinica.json`](motor/flujos/clinica.json), validado con un esquema al arrancar: se cambian sin tocar código. Funciona sin IA.
-- **Texto libre con IA:** un modelo de lenguaje entiende mensajes como «¿tenéis hueco para fisio el jueves por la tarde?» y usa herramientas para consultar huecos, reservar y cancelar. Cada herramienta es una llamada a la API de Laravel. Pide confirmación antes de reservar o cancelar.
-- **Tiempo real:** el chat de la web y el panel van por websocket. Cuando el equipo responde desde el panel, el mensaje llega al chat del paciente al momento, y el panel se actualiza solo cuando entra un mensaje.
-- **Traspaso a una persona:** si el usuario lo pide, si la IA no puede resolverlo o si un operador interviene, el asistente deja de responder. El operador recibe un aviso en su Telegram y puede contestar respondiendo a ese aviso (o devolverlo al asistente con `/devolver`), o hacerlo desde el panel.
-- **Panel en modo demo:** cualquier visitante puede abrir el panel sin clave (`/panel/?demo`). Entra con el mismo token que su chat y el servidor solo le deja ver y atender su propia conversación. Los tests comprueban que un visitante no puede leer, responder ni devolver conversaciones ajenas.
-- **Guardarraíles:** detección de posibles urgencias (aviso del 112 y traspaso), rechazo de consejos médicos sin pasar por la IA, límites de mensajes, de pulsaciones y de sesiones nuevas, solo chats privados en Telegram, y herramientas que solo actúan sobre las citas del propio paciente (quién es lo pone el motor, no el modelo).
-- **Auditoría y métricas:** cada reserva, cancelación, llamada a herramienta, traspaso y aviso queda registrado. El panel muestra actividad por canal, citas, traspasos, tasa de fallo y tiempos de la IA (media y p95), herramientas más usadas y guardarraíles activados, por 24 horas, 7 o 30 días. Si la IA falla, el operador recibe una alerta en Telegram, como mucho una cada 15 minutos.
-- **Reglas de agenda:** lunes a viernes de 9:00 a 14:00 y de 16:00 a 19:00, huecos según la duración de cada servicio, una hora de antelación mínima, hasta 30 días vista, como máximo 2 citas pendientes por persona y sin solapes. Una transacción y un índice único parcial en la base de datos impiden dos reservas en el mismo hueco aunque lleguen a la vez.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>💬 Dos canales, un solo asistente</h4>
+      Telegram y el chat de la web usan el mismo núcleo, los mismos flujos y la misma agenda. Las conversaciones de los dos canales llegan al mismo panel.
+    </td>
+    <td width="50%" valign="top">
+      <h4>🧩 Citas con botones, definidas en JSON</h4>
+      Pedir cita (servicio → día → hora → confirmar), ver las citas pendientes y cancelarlas. Los pasos, los textos y las palabras clave de los guardarraíles están en <a href="motor/flujos/clinica.json"><code>motor/flujos/clinica.json</code></a>, validado con un esquema al arrancar: se cambian sin tocar código. Funciona sin IA.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🤖 Texto libre con IA</h4>
+      Un modelo de lenguaje entiende mensajes como «¿tenéis hueco para fisio el jueves por la tarde?» y usa herramientas para consultar huecos, reservar y cancelar. Cada herramienta es una llamada a la API de Laravel. Pide confirmación antes de reservar o cancelar.
+    </td>
+    <td valign="top">
+      <h4>⚡ Tiempo real</h4>
+      El chat de la web y el panel van por websocket. Cuando el equipo responde desde el panel, el mensaje llega al chat del paciente al momento, y el panel se actualiza solo cuando entra un mensaje.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🙋 Traspaso a una persona</h4>
+      Si el usuario lo pide, si la IA no puede resolverlo o si un operador interviene, el asistente deja de responder. El operador recibe un aviso en su Telegram y puede contestar respondiendo a ese aviso (o devolverlo al asistente con <code>/devolver</code>), o hacerlo desde el panel.
+    </td>
+    <td valign="top">
+      <h4>🧪 Panel en modo demo</h4>
+      Cualquier visitante puede abrir el panel sin clave (<code>/panel/?demo</code>). Entra con el mismo token que su chat y el servidor solo le deja ver y atender su propia conversación. Los tests comprueban que un visitante no puede leer, responder ni devolver conversaciones ajenas.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🛡️ Guardarraíles</h4>
+      Detección de posibles urgencias (aviso del 112 y traspaso), rechazo de consejos médicos sin pasar por la IA, límites de mensajes, de pulsaciones y de sesiones nuevas, solo chats privados en Telegram, y herramientas que solo actúan sobre las citas del propio paciente (quién es lo pone el motor, no el modelo).
+    </td>
+    <td valign="top">
+      <h4>📊 Auditoría y métricas</h4>
+      Cada reserva, cancelación, llamada a herramienta, traspaso y aviso queda registrado. El panel muestra actividad por canal, citas, traspasos, tasa de fallo y tiempos de la IA (media y p95), herramientas más usadas y guardarraíles activados, por 24 horas, 7 o 30 días. Si la IA falla, el operador recibe una alerta en Telegram, como mucho una cada 15 minutos.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
+      <h4>📅 Reglas de agenda</h4>
+      Lunes a viernes de 9:00 a 14:00 y de 16:00 a 19:00, huecos según la duración de cada servicio, una hora de antelación mínima, hasta 30 días vista, como máximo 2 citas pendientes por persona y sin solapes. Una transacción y un índice único parcial en la base de datos impiden dos reservas en el mismo hueco aunque lleguen a la vez.
+    </td>
+  </tr>
+</table>
 
 ## Arquitectura
 
-```
-Telegram ─────┐
-Chat web (WS) ┼──► MOTOR · Node + TypeScript ──── HTTP + JSON ────► API · PHP + Laravel ──► PostgreSQL
-Panel (WS) ───┘     canales, flujos JSON, IA,     (contrato/          agenda, conversaciones,
-                    guardarraíles, traspaso        openapi.json)       auditoría, métricas, panel
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#241a4a','primaryTextColor':'#fbf9ff','primaryBorderColor':'#7c4dff','lineColor':'#ff3d8b','secondaryColor':'#1a1433','tertiaryColor':'#1a1433','clusterBkg':'#1a1433','clusterBorder':'#5d5878','fontFamily':'Segoe UI, Arial, sans-serif'}}}%%
+flowchart LR
+    subgraph Canales[" Canales "]
+        T[Telegram]
+        W[Chat web · WS]
+        P[Panel · WS]
+    end
+    T --> M
+    W --> M
+    P --> M
+    M["<b>MOTOR</b><br/>Node + TypeScript<br/>canales, flujos JSON, IA,<br/>guardarraíles, traspaso"]
+    M -- "HTTP + JSON<br/>contrato/openapi.json" --> A
+    A["<b>API</b><br/>PHP + Laravel<br/>agenda, conversaciones,<br/>auditoría, métricas, panel"]
+    A --> D[(PostgreSQL)]
+    M -. "IA (opcional)" .-> L{{Modelo de lenguaje<br/>compatible con OpenAI}}
 ```
 
 - El **motor** es el único puerto público: sirve la web y el panel, los websockets y el webhook de Telegram, y reenvía `/api/*` a Laravel, que solo escucha en `127.0.0.1` (la API interna no se reenvía). No tiene base de datos.
@@ -34,13 +111,15 @@ Más detalle en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ## Stack
 
-- **Motor:** Node.js 22, TypeScript, grammY (Telegram), ws (websockets) y zod.
-- **API:** PHP 8.4, Laravel 13, Eloquent y migraciones. SQLite en local y PostgreSQL desplegado.
-- **Panel:** React 19, TypeScript, Vite y Tailwind CSS.
-- **Chat web:** JavaScript sin dependencias.
-- **Contratos:** OpenAPI 3.1 y JSON Schema.
-- **Calidad:** Pest (agenda, API, modo demo, métricas) y Pint en PHP; `node:test` (flujos, núcleo con un modelo simulado, guardarraíles, servidor) en Node; oxlint en el panel.
-- **Despliegue:** una imagen Docker (FrankenPHP + Node) en Render (plan gratuito) con PostgreSQL en Neon.
+| Parte | Tecnologías |
+|---|---|
+| **Motor** | Node.js 22, TypeScript, grammY (Telegram), ws (websockets) y zod |
+| **API** | PHP 8.4, Laravel 13, Eloquent y migraciones. SQLite en local y PostgreSQL desplegado |
+| **Panel** | React 19, TypeScript, Vite y Tailwind CSS |
+| **Chat web** | JavaScript sin dependencias |
+| **Contratos** | OpenAPI 3.1 y JSON Schema |
+| **Calidad** | Pest (agenda, API, modo demo, métricas) y Pint en PHP; `node:test` (flujos, núcleo con un modelo simulado, guardarraíles, servidor) en Node; oxlint en el panel |
+| **Despliegue** | Una imagen Docker (FrankenPHP + Node) en Render (plan gratuito) con PostgreSQL en Neon |
 
 ## Puesta en marcha en local
 
@@ -85,6 +164,8 @@ cd motor && npm test && npm run typecheck
 cd panel && npm run build && npm run lint
 ```
 
+GitHub Actions los ejecuta en cada push y pull request a `develop` y `main` (la API, con SQLite y con PostgreSQL).
+
 ## Despliegue gratuito (Render + Neon)
 
 1. **Base de datos:** crea una base de datos gratuita en [Neon](https://neon.com) (región de la UE) y copia su cadena de conexión. Laravel la usa tal cual. Las migraciones se aplican al arrancar.
@@ -115,6 +196,6 @@ api/                   PHP + Laravel
 panel/src/             panel de recepción (React)
 web/                   página de la clínica y chat
 contrato/              openapi.json, ws.schema.json, flujo.schema.json
-docs/arquitectura.md
+docs/                  arquitectura.md e imágenes del README
 Dockerfile, arrancar.sh, render.yaml
 ```
