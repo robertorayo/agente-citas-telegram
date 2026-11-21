@@ -26,11 +26,6 @@ El proyecto son dos servicios unidos por contratos JSON: un **motor de conversac
 > [!NOTE]
 > El servicio está en el plan gratuito de Render: si lleva un rato sin visitas, la primera carga tarda alrededor de un minuto en despertar.
 
-<p align="center">
-  <img src="docs/img/panel.jpg" alt="Panel de recepción en modo demo: conversaciones en espera, chat con un paciente y botón para devolverlo al asistente" width="90%">
-  <br><sub>Panel de recepción en modo demo</sub>
-</p>
-
 ## Qué hace
 
 <table>
