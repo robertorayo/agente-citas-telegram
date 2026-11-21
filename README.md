@@ -87,7 +87,7 @@ El proyecto son dos servicios unidos por contratos JSON: un **motor de conversac
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#241a4a','primaryTextColor':'#fbf9ff','primaryBorderColor':'#7c4dff','lineColor':'#ff3d8b','secondaryColor':'#1a1433','tertiaryColor':'#1a1433','clusterBkg':'#1a1433','clusterBorder':'#5d5878','fontFamily':'Segoe UI, Arial, sans-serif'}}}%%
 flowchart LR
-    subgraph Canales
+    subgraph Canales[" Canales "]
         T[Telegram]
         W[Chat web · WS]
         P[Panel · WS]
